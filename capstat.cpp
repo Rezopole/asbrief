@@ -46,27 +46,21 @@ size_t seek_ending_parenthesis (const string &s, size_t p) {
     size_t q = s.find ('(', p);
     if (q == string::npos) return p;
 
-// cout << "HERE" << endl;
     p = q+1;
     int parenth_level = 1;
     do {
 	q = s.find_first_of ("()", p);
-// cout << "HERE 2" << endl;
 	if (q == string::npos) return string::npos;
-// cout << "HERE 3" << endl;
 	if (s[q] == '(')
 	    parenth_level ++;
 	else if (s[q] == ')')
 	    parenth_level --;
 	else {
-// cout << "HERE 4" << endl;
 	    cerr << "seek_ending_parenthesis : what are we doing here ? [" << s.substr(p) << "]" << endl;
 	    return string::npos;
 	}
-// cout << "HERE 5" << endl;
 	p = q+1;
     } while (parenth_level > 0);
-// cout << "HERE 6" << endl;
     return p;
 }
 
@@ -177,44 +171,32 @@ class Level3Addr {
 	    for (i=0 ; i<16 ; i++) b[i] = 0;
 	    t = TETHER_UNKNOWN;
 	}
-//cout << "buit1 : " << *this << endl;
     }
 
     Level3Addr (Level3Addr const &r) : t(r.t) {
 	size_t i;
 	for (i=0 ; i<16 ; i++) b[i] = r.b[i];
-//cout << "copy-buit : " << *this << " from " << r << endl;
     }
     bool operator< (const Level3Addr &a) const {
-// cout << "comp   " << *this << " < " << a << "  --->   ";
 	if (t < a.t) {
-// cout << "yes" << endl;
 	    return true;
 	} else if (a.t < t) {
-// cout << "no" << endl;
 	    return false;
 	} else {	// we have equal types
 	    size_t i;
 	    for (i=0 ; i<16 ; i++) {
 		if (b[i] < a.b[i]) {
-// cout << "yes" << endl;
 		    return true;
 		} else if (a.b[i] < b[i]) {
-// cout << "no" << endl;
 		    return false;
 		}
 	    }
 	}
-// cout << "NO (THERE)" << endl;
 	return false;	// we should get there only if a == *this
     }
 
 };
 ostream &operator<< (ostream &out, const Level3Addr &a) {
-//    Ethertype yolo;
-//    yolo.ethertype = a.t;
-//    out << "{" << yolo << "} ";
-//    out << (a.valid() ? "_valid_ " : "_invalid_ ");
     switch (a.t) {
       case TETHER_IPV4:
 	return out << (unsigned int)a.b[0] << '.' << (unsigned int)a.b[1] << '.' << (unsigned int)a.b[2] << '.' << (unsigned int)a.b[3];
@@ -249,7 +231,7 @@ Level3Addr l3mask (int nb) {
     return mask;
 }
 
-// --------- Level3AddrPair : a pair of level-3 addresses, src / dst --------------------------------------------------------------------------------------------------------------
+// --------- Level3AddrPair : a pair of level-3 addresses, src / dst ---------------------------------------------------------------------------
 
 class Level3AddrPair {
   public:
@@ -273,7 +255,7 @@ ostream &operator<< (ostream &out, const Level3AddrPair &p) {
     return out << "[" << p.src << " " << p.dst << "]";
 }
 
-// --------- PairMac : a pair of mac addresses, src / dst --------------------------------------------------------------------------------------------------------------------------
+// --------- PairMac : a pair of mac addresses, src / dst --------------------------------------------------------------------------------------
 
 class PairMac {
   public:
@@ -391,7 +373,7 @@ template <typename T> void dump_desc_len (map <T, Qualifier> const &m, ostream &
     }
 }
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------
+// --------- insert_qualifier templates --------------------------------------------------------------------------------------------------------
 
 template <typename T> void insert_qualifier (map <T, Qualifier> &m, T const &key, Qualifier q) {
     typename map <T, Qualifier>::iterator mi = m.find (key);
@@ -491,24 +473,10 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 		if (p != string::npos) {
 		    l3src = Level3Addr(TETHER_IPV4, s.substr (p));
 		    l3src.applymask (ipv4mask);
-////	if (l3src.valid()) {
-////	cout << "omask = " << ipv4mask << endl << endl ;
-////	cout << "from : " << s << endl
-////	   << "got  : " << l3src << endl
-////	   << endl;
-////	//cout << "----> IPv4 " << s.substr (p, s.find (' ', p) - p) << endl;
-////	}
 		    p = s.find (" > ", p);
 		    if (p != string::npos) {
 			l3dst = Level3Addr(TETHER_IPV4, s.substr (p+3));
 			l3dst.applymask (ipv4mask);
-////	if (l3dst.valid()) {
-////	cout << "omask = " << ipv4mask << endl << endl ;
-////	cout << "from : " << s << endl
-////	   << "got  : " << l3dst << endl
-////	   << endl;
-////	//cout << "----> IPv4 " << s.substr (p, s.find (' ', p) - p) << endl;
-////	}
 		    }
 		}
 
@@ -520,9 +488,8 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 	if (src.valid()) {
 	    nbpacket ++;
 	    totsize += packetlen;
-
-//template <typename T> void insert_qualifier (map <T, Qualifier> &m, T const &key, Qualifier q) {
 	    Qualifier q (packetlen);
+
 	    insert_qualifier (rep_src_macaddr, src, q);
 	    if (dst.valid()) {
 		insert_qualifier (rep_dst_macaddr, dst, q);
@@ -538,63 +505,6 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 		    insert_qualifier (rep_l3pair, pair, q);
 		}
 	    }
-		
-
-//	    map <MacAddr, Qualifier>::iterator mi = rep_src_macaddr.find(src);
-//	    if (mi != rep_src_macaddr.end())
-//		mi->second += Qualifier (packetlen);
-//	    else
-//		rep_src_macaddr[src] = Qualifier (packetlen);
-//
-//	    if (dst.valid()) {
-//		map <MacAddr, Qualifier>::iterator mi = rep_dst_macaddr.find(dst);
-//		if (mi != rep_dst_macaddr.end())
-//		    mi->second += Qualifier (packetlen);
-//		else
-//		    rep_dst_macaddr[dst] = Qualifier (packetlen);
-//
-//		PairMac pair(src, dst);
-//		{
-//		map <PairMac, Qualifier>::iterator mi = rep_pair_macaddr.find(pair);
-//		if (mi != rep_pair_macaddr.end())
-//		    mi->second += Qualifier (packetlen);
-//		else
-//		    rep_pair_macaddr[pair] = Qualifier (packetlen);
-//		}
-//		
-//	    }
-//	    {	map <Ethertype, Qualifier>::iterator mi = rep_ethertype.find (ethertype);
-//		if (mi != rep_ethertype.end())
-//		    mi->second += Qualifier (packetlen);
-//		else
-//		    rep_ethertype[ethertype] = Qualifier (packetlen);
-//	    }
-//	    if (l3src.valid())
-//	    {	
-//		map <Level3Addr, Qualifier>::iterator mi = rep_l3src.find (l3src);
-//		if (mi != rep_l3src.end()) {
-//		    mi->second += Qualifier (packetlen);
-//		} else {
-//		    rep_l3src[l3src] = Qualifier (packetlen);
-//		}
-//		if (l3dst.valid())
-//		{	
-//		    map <Level3Addr, Qualifier>::iterator mi = rep_l3dst.find (l3dst);
-//		    if (mi != rep_l3dst.end()) {
-//			mi->second += Qualifier (packetlen);
-//		    } else {
-//			rep_l3dst[l3dst] = Qualifier (packetlen);
-//		    }
-//
-//		    Level3AddrPair pair(l3src, l3dst);
-//		    {	map <Level3AddrPair, Qualifier>::iterator mi = rep_l3pair.find(pair);
-//			if (mi != rep_l3pair.end())
-//			    mi->second += Qualifier (packetlen);
-//			else
-//			    rep_l3pair[pair] = Qualifier (packetlen);
-//		    }
-//		}
-//	    }
 	}
     }
 
@@ -632,12 +542,6 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 
 int main (void) {
 
-    // // Level3Addr ipv6 (TETHER_IPV6, "2606:2800:1::5.53 > 2a00:1bb0::330:204:23ff:fecb:8768.3615:");
-    // Level3Addr ipv6 (TETHER_IPV6, "2606:2800:1::5");
-    // // Level3Addr ipv6 (TETHER_IPV6, "2a00:1bb0::330:204:23ff:fecb:8768.3615");
-    // // Level3Addr ipv6 (TETHER_IPV6, "2001:db8:8714:3a90::12");
-    // cout << " ipv6 = [" << ipv6 << "]" << endl;
-    // return 0;
-
     return capstat (cin, cout);
+
 }
