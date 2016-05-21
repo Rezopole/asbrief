@@ -24,6 +24,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <strstream>
 #include <string>
 #include <list>
 #include <map>
@@ -197,9 +198,11 @@ class Level3Addr {
 
 };
 ostream &operator<< (ostream &out, const Level3Addr &a) {
+    strstream s;
     switch (a.t) {
       case TETHER_IPV4:
-	return out << (unsigned int)a.b[0] << '.' << (unsigned int)a.b[1] << '.' << (unsigned int)a.b[2] << '.' << (unsigned int)a.b[3];
+	s << (unsigned int)a.b[0] << '.' << (unsigned int)a.b[1] << '.' << (unsigned int)a.b[2] << '.' << (unsigned int)a.b[3];
+	return out << s.str();
 	break;
       case TETHER_IPV6:
 	char str[INET6_ADDRSTRLEN];
@@ -252,19 +255,21 @@ class Level3AddrPair {
     }
 };
 ostream &operator<< (ostream &out, const Level3AddrPair &p) {
-    return out << "[" << p.src << " " << p.dst << "]";
+    strstream s;
+    s << "[ " << setw(18) << p.src << " " << setw(18) << p.dst << " ]";
+    return out << s.str();
 }
 
-// --------- PairMac : a pair of mac addresses, src / dst --------------------------------------------------------------------------------------
+// --------- MacPair : a pair of mac addresses, src / dst --------------------------------------------------------------------------------------
 
-class PairMac {
+class MacPair {
   public:
     MacAddr src, dst;
-    PairMac () {}
-    PairMac (MacAddr src, MacAddr dst) :
+    MacPair () {}
+    MacPair (MacAddr src, MacAddr dst) :
 	src(src), dst(dst) {}
-    PairMac (PairMac const & o) : src(o.src), dst(o.dst) {}
-    bool operator< (const PairMac &a) const {
+    MacPair (MacPair const & o) : src(o.src), dst(o.dst) {}
+    bool operator< (const MacPair &a) const {
 	if (a.src < src)
 	    return true;
 	else if (src < a.src)
@@ -275,8 +280,8 @@ class PairMac {
 	    return false;
     }
 };
-ostream &operator<< (ostream &out, const PairMac &p) {
-    return out << "[" << p.src << " " << p.dst << "]";
+ostream &operator<< (ostream &out, const MacPair &p) {
+    return out << "[ " << p.src << " " << p.dst << " ]";
 }
 
 // --------- Qualifier -------------------------------------------------------------------------------------------------------------------------
@@ -327,7 +332,7 @@ template <typename T> void dump_desc_nb (map <T, Qualifier> const &m, ostream &c
 	curtot += (*li)->second.nb;
 	n++;
 	cout << setw(nw)   << n << " "
-	     << setw(10)   << (*li)->first << " "
+	     << setw(18)   << (*li)->first << " "
 	     << setw(maxw) << (*li)->second.nb << " "
 	     << setw(3)    << (100*(*li)->second.nb)/total.nb << "% "
 	     << setw(3)    << (100*curtot)/total.nb << "%"
@@ -364,7 +369,7 @@ template <typename T> void dump_desc_len (map <T, Qualifier> const &m, ostream &
 	curtot += (*li)->second.len;
 	n++;
 	cout << setw(nw)   << n << " "
-	     << setw(10)   << (*li)->first << " "
+	     << setw(18)   << (*li)->first << " "
 	     << setw(maxw) << (*li)->second.len << " "
 	     << setw(3)    << (100*(*li)->second.len)/total.len << "% "
 	     << setw(3)    << (100*curtot)/total.len << "%"
@@ -388,11 +393,15 @@ template <typename T> void insert_qualifier (map <T, Qualifier> &m, T const &key
 
 map <MacAddr, Qualifier> rep_src_macaddr;
 map <MacAddr, Qualifier> rep_dst_macaddr;
-map <PairMac, Qualifier> rep_pair_macaddr;
+map <MacPair, Qualifier> rep_pair_macaddr;
 
 map <Level3Addr, Qualifier> rep_l3src;
 map <Level3Addr, Qualifier> rep_l3dst;
 map <Level3AddrPair, Qualifier> rep_l3pair;
+
+map <Level3Addr, Qualifier> rep_ip6src;
+map <Level3Addr, Qualifier> rep_ip6dst;
+map <Level3AddrPair, Qualifier> rep_ip6pair;
 
 map <Ethertype, Qualifier> rep_ethertype;
 
@@ -493,41 +502,62 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 	    insert_qualifier (rep_src_macaddr, src, q);
 	    if (dst.valid()) {
 		insert_qualifier (rep_dst_macaddr, dst, q);
-		PairMac pair(src, dst);
+		MacPair pair(src, dst);
 		insert_qualifier (rep_pair_macaddr, pair, q);
 		insert_qualifier (rep_ethertype, ethertype, q);
 	    }
 	    if (l3src.valid()) {
 		insert_qualifier (rep_l3src, l3src, q);
+		if (l3src.t == TETHER_IPV6)
+		    insert_qualifier (rep_ip6src, l3src, q);
 		if (l3dst.valid()) {
 		    insert_qualifier (rep_l3dst, l3dst, q);
 		    Level3AddrPair pair(l3src, l3dst);
 		    insert_qualifier (rep_l3pair, pair, q);
+		    if (l3dst.t == TETHER_IPV6) {
+			insert_qualifier (rep_ip6dst, l3dst, q);
+			insert_qualifier (rep_ip6pair, pair, q);
+		    }
 		}
 	    }
 	}
     }
 
-    dump_desc_nb (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    dump_desc_nb  (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
     dump_desc_len (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
 
-    dump_desc_nb (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    dump_desc_nb  (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
     dump_desc_len (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
 
-    dump_desc_nb (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    dump_desc_nb  (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
     dump_desc_len (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
 
-    dump_desc_nb (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl;
+    dump_desc_nb  (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl;
     dump_desc_len (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl;
 
-    dump_desc_nb (rep_l3src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    dump_desc_nb  (rep_l3src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
     dump_desc_len (rep_l3src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
 
-    dump_desc_nb (rep_l3dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    dump_desc_nb  (rep_l3dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
     dump_desc_len (rep_l3dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
 
-    dump_desc_nb (rep_l3pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    dump_desc_nb  (rep_l3pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
     dump_desc_len (rep_l3pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+
+    if (!rep_ip6src.empty()) {
+	dump_desc_nb  (rep_ip6src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+	dump_desc_len (rep_ip6src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    }
+
+    if (!rep_ip6dst.empty()) {
+	dump_desc_nb  (rep_ip6dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+	dump_desc_len (rep_ip6dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    }
+
+    if (!rep_ip6pair.empty()) {
+	dump_desc_nb  (rep_ip6pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+	dump_desc_len (rep_ip6pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    }
 
 //    cout << "nb packet = " << nbpacket << endl;
 //    cout << "nb src mac = " << rep_src_macaddr.size() << endl;
@@ -538,9 +568,53 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 }
 
 
+void usage (ostream &cout, char *cmde0) {
+    cout << "usage :  " << cmde0 << " [-h|--help] [--ceil=xx%] [--mask=(0-32)] [--nomask]" << endl
+         << "                  [--ipv4mask=(0-32)] [--ipv6mask=(0-128)]"
+	 << endl;
+}
 
+int main (int nb, char ** cmde) {
 
-int main (void) {
+    int i;
+    for (i=1 ; i<nb ; i++) {
+	if (cmde[i][0] == '-') {
+	    if ((strcmp (cmde[i], "--help") == 0) || (strcmp (cmde[i], "-h") ==0)) {
+		usage (cout, cmde[0]);
+		return 0;
+	    }
+	    if (strncmp (cmde[i], "--ceil=", 7) == 0) {
+		int p = atoi (cmde[i] + 7);
+		if (p > 0)
+		    percent_ceil = (double)p/100.0;
+		else
+		    cerr << "unsuable pecentage : " << p << ", ignored" << endl;
+	    }
+	    if (strncmp (cmde[i], "--mask=", 7) == 0) {
+		int m = atoi (cmde[i] + 7);
+		if ((m >= 0) && (m <= 32)) {
+		    ipv4_mask = m;
+		    ipv6_mask = 2 * m;
+		}
+	    }
+	    if (strncmp (cmde[i], "--ipv4mask=", 11) == 0) {
+		int m = atoi (cmde[i] + 11);
+		if ((m >= 0) && (m <= 32)) {
+		    ipv4_mask = m;
+		}
+	    }
+	    if (strncmp (cmde[i], "--ipv6mask=", 11) == 0) {
+		int m = atoi (cmde[i] + 11);
+		if ((m >= 0) && (m <= 128)) {
+		    ipv6_mask = m;
+		}
+	    }
+	    if (strcmp (cmde[i], "--nomask") == 0) {
+		ipv4_mask = 32;
+		ipv6_mask = 128;
+	    }
+	}
+    }
 
     return capstat (cin, cout);
 
