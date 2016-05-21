@@ -1,0 +1,18 @@
+
+
+data sorting and consolidations
+    use whois and an inner cache for per-AS repartition
+    use a BGP full-view dump for per-AS repartition
+    use a mac-address registry for human-clarifyed output (iptraf format ?)
+
+command flags
+    toggle between packet number views or packet size views
+
+Unit Testings
+    provide aneutral and rather exhaustive capture for unit-testings
+
+Output
+    json-encoded output
+    html output
+    svg or better ?
+

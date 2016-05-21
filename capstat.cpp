@@ -411,6 +411,8 @@ size_t nbpacket = 0;
 int ipv4_mask = 24;
 int ipv6_mask = ipv4_mask*2;
 
+bool displaysizes = true;
+bool displayframes = true;
 double percent_ceil = 0.9;
 
 typedef enum {
@@ -523,40 +525,35 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 	}
     }
 
-    dump_desc_nb  (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-    dump_desc_len (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    {    dump_desc_nb  (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
+    {    dump_desc_len (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
 
-    dump_desc_nb  (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-    dump_desc_len (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    if (displayframes) {    dump_desc_nb  (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
 
-    dump_desc_nb  (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-    dump_desc_len (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    if (displayframes) {    dump_desc_nb  (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
 
-    dump_desc_nb  (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl;
-    dump_desc_len (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl;
+    if (displayframes) {    dump_desc_nb  (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
 
-    dump_desc_nb  (rep_l3src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-    dump_desc_len (rep_l3src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    if (displayframes) {    dump_desc_nb  (rep_l3src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_l3src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
 
-    dump_desc_nb  (rep_l3dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-    dump_desc_len (rep_l3dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+    if (displayframes) {    dump_desc_nb  (rep_l3dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_l3dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
 
-    dump_desc_nb  (rep_l3pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-    dump_desc_len (rep_l3pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-
-    if (!rep_ip6src.empty()) {
-	dump_desc_nb  (rep_ip6src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-	dump_desc_len (rep_ip6src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-    }
+    if (displayframes) {    dump_desc_nb  (rep_l3pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_l3pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
 
     if (!rep_ip6dst.empty()) {
-	dump_desc_nb  (rep_ip6dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-	dump_desc_len (rep_ip6dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+	if (displayframes) {    dump_desc_nb  (rep_ip6dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+	if (displaysizes)  {    dump_desc_len (rep_ip6dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
     }
 
     if (!rep_ip6pair.empty()) {
-	dump_desc_nb  (rep_ip6pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
-	dump_desc_len (rep_ip6pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl;
+	if (displayframes) {    dump_desc_nb  (rep_ip6pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+	if (displaysizes)  {    dump_desc_len (rep_ip6pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
     }
 
 //    cout << "nb packet = " << nbpacket << endl;
@@ -569,8 +566,9 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 
 
 void usage (ostream &cout, char *cmde0) {
-    cout << "usage :  " << cmde0 << " [-h|--help] [--ceil=xx%] [--mask=(0-32)] [--nomask]" << endl
-         << "                  [--ipv4mask=(0-32)] [--ipv6mask=(0-128)]"
+    cout << "usage :  " << cmde0 << " [-h|--help] [--ceil=xx%] [--sizes] [--frames] [--sizes+frames (default)]" << endl
+         << "                  [--mask=(0-32)] [--nomask]" << endl
+         << "                  [--ipv4mask=(0-32)] [--ipv6mask=(0-128)]" << endl
 	 << endl;
 }
 
@@ -582,6 +580,18 @@ int main (int nb, char ** cmde) {
 	    if ((strcmp (cmde[i], "--help") == 0) || (strcmp (cmde[i], "-h") ==0)) {
 		usage (cout, cmde[0]);
 		return 0;
+	    }
+	    if (strcmp (cmde[i], "--sizes") == 0) {
+		displaysizes = true;
+		displayframes = false;
+	    }
+	    if (strcmp (cmde[i], "--frames") == 0) {
+		displaysizes = false;
+		displayframes = true;
+	    }
+	    if (strcmp (cmde[i], "--sizes+frames") == 0) {
+		displaysizes = true;
+		displayframes = true;
 	    }
 	    if (strncmp (cmde[i], "--ceil=", 7) == 0) {
 		int p = atoi (cmde[i] + 7);

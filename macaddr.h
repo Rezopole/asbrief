@@ -45,7 +45,6 @@ class MacAddr  {
     MacAddr (void) : addr(0xffffffffffffffff) {}
     MacAddr (MacAddr const & o) : addr(o.addr) {}
     MacAddr (uint64_t addr) : addr(addr) {
-cerr << "on est la : " << addr << endl; 
     }
     MacAddr (const string &s) : addr (0xffffffffffffffff) {
 	if (s.size() < 14) {

@@ -2,9 +2,7 @@
 all: capstat
 
 vimtest: capstat
-	./capstat -h
-	./capstat --help
-	####	tcpdump -vvv -e -n -r capture* | head -1000 | ./capstat
+	tcpdump -vvv -e -n -r capture* | head -1000 | ./capstat --sizes
 	####	tcpdump -vvv -e -n -r capture* | head -10000 | ./capstat
 	# tcpdump -vvv -e -n -r capture* | head -100000 | ./capstat
 
