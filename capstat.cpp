@@ -333,6 +333,14 @@ ostream &operator<< (ostream &out, const Level3AddrPair &p) {
     s << "[ " << setw(18) << p.src << " " << setw(18) << p.dst << " ]";
     return out << s.str();
 }
+void matcher (const Level3AddrPair &p, ostream &out) {
+    out << '[';
+    matcher (p.src, out);
+    out << " ";
+    matcher (p.dst, out);
+    out << ']';
+}
+
 
 // --------- MacPair : a pair of mac addresses, src / dst --------------------------------------------------------------------------------------
 
@@ -356,6 +364,14 @@ class MacPair {
 };
 ostream &operator<< (ostream &out, const MacPair &p) {
     return out << "[ " << p.src << " " << p.dst << " ]";
+}
+
+void matcher (const MacPair &p, ostream &out) {
+    out << '[';
+    matcher (p.src, out);
+    out << " ";
+    matcher (p.dst, out);
+    out << ']';
 }
 
 // --------- Qualifier -------------------------------------------------------------------------------------------------------------------------
