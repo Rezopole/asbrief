@@ -24,7 +24,8 @@
 
 #include <iostream>
 #include <iomanip>
-#include <strstream>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <list>
 #include <map>
@@ -63,6 +64,37 @@ size_t seek_ending_parenthesis (const string &s, size_t p) {
 	p = q+1;
     } while (parenth_level > 0);
     return p;
+}
+
+// --------- ethernet.desc ---------------------------------------------------------------------------------------------------------------------
+
+map <MacAddr, string> ethernetdesc;
+
+void readethernetdesc (const string &fname) {
+    ifstream file(fname.c_str());
+
+    while (file) {
+	string s;
+	readline (file, s);
+	size_t p = s.find(':');
+	if (p == string::npos)
+	    continue;
+	MacAddr m(s.substr (0,p));
+	if (m.invalid())
+	    continue;
+	string desc = s.substr (p+1);
+	if (desc.size() == 0)
+	    continue;
+	ethernetdesc[m] = desc;
+    }
+}
+
+void matcher (const MacAddr &m, ostream &out) {
+    map <MacAddr, string>::iterator mi = ethernetdesc.find(m);
+    if (mi == ethernetdesc.end())
+	out << m;
+    else
+	out << mi->second << " (" << m << ")";
 }
 
 // --------- Ethertype -------------------------------------------------------------------------------------------------------------------------
@@ -116,8 +148,13 @@ ostream &operator<< (ostream &out, const Ethertype &p) {
 
 class Level3Addr;
 ostream &operator<< (ostream &out, const Level3Addr &a);
+Level3Addr l3mask (int nb);
 
 class Level3Addr {
+  private:
+    static Level3Addr mask[128];
+    static bool mask_not_initialized;
+
   public:
     TEthertype t;
     unsigned char b[16];
@@ -136,7 +173,24 @@ class Level3Addr {
 	for (i=0 ; i<16 ; i++) b[i] &= mask.b[i];
     }
 
-    Level3Addr (TEthertype proposed_type, string s) : t(TETHER_UNKNOWN) {
+    inline void init_mask (void) {
+	if (mask_not_initialized) {
+	    size_t i;
+	    for (i=0 ; i<128 ; i++) {
+		mask[i] = l3mask(i);
+	    }
+	    mask_not_initialized = false;
+	}
+    }
+
+    void applymask (int masklen) {
+	init_mask();
+	if (masklen < 0) masklen = 0;
+	if (masklen >=128) return;
+	applymask (mask[masklen]);
+    }
+
+    Level3Addr (TEthertype proposed_type, string const &s) : t(TETHER_UNKNOWN) {
 	size_t p, i;
 	switch (proposed_type) {
 	  case TETHER_IPV4:
@@ -196,9 +250,27 @@ class Level3Addr {
 	return false;	// we should get there only if a == *this
     }
 
+    bool operator== (const Level3Addr &a) const {
+	if (t != a.t) {
+	    return false;
+	}
+	// we have equal types
+	size_t i;
+	for (i=0 ; i<16 ; i++) {
+	    if (b[i] != a.b[i]) {
+		return false;
+	    }
+	}
+	return true;	// we should get there only if a == *this
+    }
+
 };
+
+bool Level3Addr::mask_not_initialized = true;
+Level3Addr Level3Addr::mask[128];
+
 ostream &operator<< (ostream &out, const Level3Addr &a) {
-    strstream s;
+    stringstream s;
     switch (a.t) {
       case TETHER_IPV4:
 	s << (unsigned int)a.b[0] << '.' << (unsigned int)a.b[1] << '.' << (unsigned int)a.b[2] << '.' << (unsigned int)a.b[3];
@@ -234,6 +306,8 @@ Level3Addr l3mask (int nb) {
     return mask;
 }
 
+void matcher (const Level3Addr &a, ostream &out);  // thyis one is defined later because of Level3Addr / Prefix interdependencies
+
 // --------- Level3AddrPair : a pair of level-3 addresses, src / dst ---------------------------------------------------------------------------
 
 class Level3AddrPair {
@@ -255,7 +329,7 @@ class Level3AddrPair {
     }
 };
 ostream &operator<< (ostream &out, const Level3AddrPair &p) {
-    strstream s;
+    stringstream s;
     s << "[ " << setw(18) << p.src << " " << setw(18) << p.dst << " ]";
     return out << s.str();
 }
@@ -304,12 +378,16 @@ class Qualifier {
 
 // --------- desc_[nb/len] Templates for map<T,Qualifier> types --------------------------------------------------------------------------------
 
+template <typename T> void matcher (const T &a, ostream &out) {
+    out << "    [" << a << "]    " ;
+}
+
 template <typename T> bool desc_comparator_nb (typename map <T, Qualifier>::const_iterator mi1, typename map <T, Qualifier>::const_iterator mi2) {
     return mi1->second.nb > mi2->second.nb;
 }
 
 
-template <typename T> void dump_desc_nb (map <T, Qualifier> const &m, ostream &cout, Qualifier total, double ceil=1.0) {
+template <typename T> void dump_desc_nb (map <T, Qualifier> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
     cout << m.size() << " entries" << ", total: " << total.nb << " packets" << endl;
     if ((m.size() ==0) || (total.nb==0))
 	return;
@@ -331,9 +409,14 @@ template <typename T> void dump_desc_nb (map <T, Qualifier> const &m, ostream &c
     for (li=l.begin() ; li!=l.end() ; li++) {
 	curtot += (*li)->second.nb;
 	n++;
-	cout << setw(nw)   << n << " "
-	     << setw(18)   << (*li)->first << " "
-	     << setw(maxw) << (*li)->second.nb << " "
+	cout << setw(nw)   << n << " ";
+	if (matched) {
+	    cout << setw(45);
+	    matcher((*li)->first, cout);
+	    cout << " ";
+	} else
+	     cout << setw(18)   << (*li)->first << " ";
+	cout << setw(maxw) << (*li)->second.nb << " "
 	     << setw(3)    << (100*(*li)->second.nb)/total.nb << "% "
 	     << setw(3)    << (100*curtot)/total.nb << "%"
 	     << endl;
@@ -346,7 +429,7 @@ template <typename T> bool desc_comparator_len (typename map <T, Qualifier>::con
 }
 
 
-template <typename T> void dump_desc_len (map <T, Qualifier> const &m, ostream &cout, Qualifier total, double ceil=1.0) {
+template <typename T> void dump_desc_len (map <T, Qualifier> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
     cout << m.size() << " entries" << ", total: " << total.len << " bytes" << endl;
     if ((m.size() ==0) || (total.len==0))
 	return;
@@ -368,9 +451,14 @@ template <typename T> void dump_desc_len (map <T, Qualifier> const &m, ostream &
     for (li=l.begin() ; li!=l.end() ; li++) {
 	curtot += (*li)->second.len;
 	n++;
-	cout << setw(nw)   << n << " "
-	     << setw(18)   << (*li)->first << " "
-	     << setw(maxw) << (*li)->second.len << " "
+	cout << setw(nw)   << n << " " ;
+	if (matched) {
+	    cout << setw(45);
+	    matcher((*li)->first, cout);
+	    cout << " ";
+	} else
+	     cout << setw(18)   << (*li)->first << " ";
+	cout << setw(maxw) << (*li)->second.len << " "
 	     << setw(3)    << (100*(*li)->second.len)/total.len << "% "
 	     << setw(3)    << (100*curtot)/total.len << "%"
 	     << endl;
@@ -387,6 +475,244 @@ template <typename T> void insert_qualifier (map <T, Qualifier> &m, T const &key
     else
 	m[key] = q;
 }
+
+// --------- hash full view --------------------------------------------------------------------------------------------------------------------
+
+
+class Prefix {
+  public:
+    Level3Addr a;   // start address
+    int ml;	    // mask len, -1 == invalid prefix
+
+    Prefix (void) : a(), ml(-1) {}
+
+    Prefix (Prefix const & pr) : a(pr.a), ml(pr.ml) {}
+
+    Prefix (Level3Addr prop_a, int prop_ml, bool lousycreation = false) : a(), ml(-1) {
+	switch (prop_a.t) {
+	    case TETHER_IPV4:
+		if ((prop_ml <0) || (prop_ml>32)) {
+		    ml = -1;
+		    return;
+		}
+		break;
+	    case TETHER_IPV6:
+		if ((prop_ml <0) || (prop_ml>128)) {
+		    ml = -1;
+		    return;
+		}
+		break;
+	    default:
+		ml = -1;
+		return;
+	}
+
+	Level3Addr m(prop_a);
+	m.applymask (prop_ml);
+	if (lousycreation) {	// we accept unmatched address start vs masklen
+	    a = m;
+	    ml = prop_ml;
+// cerr << "good prefix1 : " << prop_a << "/" << prop_ml << endl;
+	    return;
+	}
+	if (prop_a == m) {
+	    a = prop_a;
+	    ml = prop_ml;
+// cerr << "good prefix2 : " << prop_a << "/" << prop_ml << endl;
+	    return;
+	}
+cerr << "bad prefix : " << prop_a << "/" << prop_ml << endl;
+	ml = -1;
+	return;
+    }
+    inline bool valid (void) const {
+	return (ml != -1);
+    }
+    inline bool invalid (void) const {
+	return (ml == -1);
+    }
+    bool operator< (const Prefix &pr) const {
+	if (a < pr.a) {
+	    return true;
+	} else if (pr.a < a) {
+	    return false;
+	} else if (ml < pr.ml) {
+	    return true;
+	} else if (pr.ml < ml) {
+	    return false;
+	}
+	return false;
+    }
+    bool operator== (const Prefix &pr) const {
+	if (a == pr.a) {
+	    if (ml != pr.ml)
+		return false;
+	    else
+		return true;
+	} else
+	    return false;
+    }
+};
+ostream &operator<< (ostream &out, const Prefix &pr) {
+    return out << pr.a << "/" << pr.ml;
+}
+
+class HashedPrefixes {
+  public:
+    map <Prefix, size_t> m;
+    HashedPrefixes () {
+	/// Level3Addr zero(TETHER_IPV6, "0::");
+	Level3Addr zero(TETHER_IPV4, "0.0.0.0");
+	Prefix All (zero, 0);
+	m[All] = 0;
+    }
+    void insert (Prefix const &pr, int AS) {
+	if (pr.invalid()) return;
+//	map <Prefix, size_t>::iterator mi = m.upper_bound (pr);
+//	if (mi == m.end()) { // this should not occur since we've pushed an initial all-match-prefix
+//	    cerr << "HashedPrefixes::insert : \"Houston, we have a problem !\" : no upper bound found pr=" << pr << endl;
+//	    return;
+//	}
+//	if (mi->first == pr) { // we've got a duplicate ?? 
+//	    cerr << "HashedPrefixes::insert : duplicate prefix : " << pr << endl;
+//	    return;
+//	}
+	m[pr] = AS;
+    }
+    int getAS (Level3Addr const &a) {
+	Prefix tofind(a, 32);
+	map <Prefix, size_t>::iterator mi = m.upper_bound (tofind);
+	if (mi!=m.begin())
+	    mi --;
+////////	if (mi == m.end()) { // this should not occur since we've pushed an initial all-match-prefix
+////////	    cerr << "HashedPrefixes::insert : \"Houston, we have a problem !\" : no upper bound found pr=" << a << " as prefix " << tofind << endl;
+////////	    return -1;
+////////	}
+//	if (mi->first == pr) { // we've got a duplicate ?? 
+//	    cerr << "HashedPrefixes::insert : duplicate prefix : " << pr << endl;
+//	    return;
+//	}
+//cerr << "   getAS(" << a << ") = " << mi->first << " = " << mi->second << endl;
+	return mi->second;
+    }
+};
+ostream & operator<< (ostream &out, const HashedPrefixes &h) {
+    map <Prefix, size_t>::const_iterator mi;
+    for (mi=h.m.begin() ; mi!=h.m.end() ; mi++) {
+	out << "   m[" << mi->first << "] = " << mi->second << endl;
+    }
+    return out;
+}
+
+HashedPrefixes view_ipv4;
+
+int retrieve_last_as (const string & s) {
+    size_t p;
+    if ((s.size() < 64) || (!isalnum (s[63])))
+	return -1;
+    p = s.rfind (' ');
+    if (p == string::npos) return -1;
+    int AS = atoi (s.substr(p+1).c_str());
+    if (AS != 0) return AS;
+    if (p == 0) return -1;
+
+    p = s.rfind (' ', p-1);
+    if (p == string::npos) return -1;
+    AS = atoi (s.substr(p+1).c_str());
+    if (AS != 0) return AS;
+
+    return -1;
+}
+
+typedef enum {
+    RFV_SEEK_LEGEND,
+    RFV_SEEK_EXPLICITPREFIX,
+    RFV_SEEKBESTROUTE
+} RFV_State;
+
+void hash_full_bgp (istream &cin) {
+    RFV_State status = RFV_SEEK_LEGEND;
+
+    size_t lno = 0;
+    Prefix curprefix;
+
+    while (cin) {
+	string s;
+	lno++; readline (cin, s);
+	size_t p, q;
+
+//if (lno >= 100) return;
+
+	switch (status) {
+	  case RFV_SEEK_LEGEND:
+	    if (s != "     Network          Next Hop            Metric LocPrf Weight Path") {
+		continue;
+	    } else {
+		status = RFV_SEEK_EXPLICITPREFIX;
+	    }
+	    break;
+
+	  case RFV_SEEK_EXPLICITPREFIX:
+	    if ((s.size() > 6) && (! isxdigit (s[5]))) continue;
+	    p = s.find_first_of ("0123456789abcdefABCDEF");
+	    if (p != string::npos) {
+		q = s.find_first_not_of ("0123456789", p);
+		if ((q != string::npos) && (s[q] == '.')) { // it looks like an IPv4 !	
+		    Level3Addr prefixbase(TETHER_IPV4, s.substr(p));
+		    q = s.find_first_not_of("0123456789.", p);
+		    if ((q != string::npos) && (s[q] == '/')) {	// it looks like an IPv4 prefix ...
+			int masklen = atoi (s.substr (q+1).c_str());
+			Prefix prefix(prefixbase, masklen);
+			if (prefix.valid()) {
+			    if (s[2] == '>') {
+				int AS = retrieve_last_as (s);
+				if (AS != -1)
+				    view_ipv4.insert (prefix, AS);
+			    } else {
+				curprefix = prefix;
+				status = RFV_SEEKBESTROUTE;
+			    }
+			}
+			    
+		    }
+		} else {
+		    q = s.find_first_not_of ("0123456789abcdefABCDEF", p);
+		    if ((q != string::npos) && (s[q] == ':')) { // it looks like an IPv6 !	
+return;
+		    }
+		}
+	    }
+	    break;
+
+	  case RFV_SEEKBESTROUTE:
+	    if (s[2] == '>') {
+		int AS = retrieve_last_as (s);
+		if (AS != -1)
+		    view_ipv4.insert (curprefix, AS);
+		status = RFV_SEEK_EXPLICITPREFIX;
+	    }
+	    break;
+	}
+    }
+}
+
+void matcher (const Level3Addr &a, ostream &out) {
+    int AS = 0;
+    switch (a.t) {
+      case TETHER_IPV4:
+	AS = view_ipv4.getAS(a);
+	    
+	if (AS == 0)
+	    out << a;
+	else
+	    out << a << " (" << AS << ")";
+	break;
+
+      default:
+	out << a;
+    }
+}
+
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -414,6 +740,7 @@ int ipv6_mask = ipv4_mask*2;
 bool displaysizes = true;
 bool displayframes = true;
 double percent_ceil = 0.9;
+bool matched = true;
 
 typedef enum {
     SEEK_NEXT_PACKET,
@@ -483,11 +810,13 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 		p = s.find_first_not_of (' ');
 		if (p != string::npos) {
 		    l3src = Level3Addr(TETHER_IPV4, s.substr (p));
-		    l3src.applymask (ipv4mask);
+//		    l3src.applymask (ipv4mask);
+l3src.applymask (ipv4_mask);
 		    p = s.find (" > ", p);
 		    if (p != string::npos) {
 			l3dst = Level3Addr(TETHER_IPV4, s.substr (p+3));
-			l3dst.applymask (ipv4mask);
+//			l3dst.applymask (ipv4mask);
+l3dst.applymask (ipv4_mask);
 		    }
 		}
 
@@ -528,32 +857,32 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
     {    dump_desc_nb  (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
     {    dump_desc_len (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_l3src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_l3src, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  (rep_l3src, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_l3src, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_l3dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_l3dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  (rep_l3dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_l3dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_l3pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_l3pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  (rep_l3pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_l3pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
     if (!rep_ip6dst.empty()) {
-	if (displayframes) {    dump_desc_nb  (rep_ip6dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
-	if (displaysizes)  {    dump_desc_len (rep_ip6dst, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+	if (displayframes) {    dump_desc_nb  (rep_ip6dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+	if (displaysizes)  {    dump_desc_len (rep_ip6dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
     }
 
     if (!rep_ip6pair.empty()) {
-	if (displayframes) {    dump_desc_nb  (rep_ip6pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
-	if (displaysizes)  {    dump_desc_len (rep_ip6pair, cout, Qualifier(nbpacket,totsize), percent_ceil); cout << endl; }
+	if (displayframes) {    dump_desc_nb  (rep_ip6pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+	if (displaysizes)  {    dump_desc_len (rep_ip6pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
     }
 
 //    cout << "nb packet = " << nbpacket << endl;
@@ -625,6 +954,63 @@ int main (int nb, char ** cmde) {
 	    }
 	}
     }
+
+    // JDJDJDJD we should improve this part !!!
+    readethernetdesc ("ethernet.desc");
+
+
+if (false)	// set of basic tests for Prefix maps
+{
+    cerr << "addr = " << Level3Addr(TETHER_IPV4, "134.214.0.0") << endl;
+
+    Prefix       univ(Level3Addr(TETHER_IPV4, "134.214.0.0"   ), 16),
+	         cism(Level3Addr(TETHER_IPV4, "134.214.100.0" ), 22),
+	     outerbad(Level3Addr(TETHER_IPV4, "134.214.100.0" ), 21),
+	        outer(Level3Addr(TETHER_IPV4, "134.214.96.0"  ), 21),
+	        outerin(Level3Addr(TETHER_IPV4, "134.214.96.0"  ), 22);
+
+    view_ipv4.insert(univ,	2200);
+    view_ipv4.insert(cism,	2060);
+    view_ipv4.insert(outerbad,	2200);
+    view_ipv4.insert(outer,	2200);
+    view_ipv4.insert(outerin,	43100);
+
+cout << "view_ipv4.size = " <<view_ipv4.m.size() << endl;
+cout << view_ipv4 << endl << endl;
+
+{
+map <Level3Addr, int> m;
+m[Level3Addr(TETHER_IPV4, "134.214.100.6")] =   1;
+m[Level3Addr(TETHER_IPV4, "134.214.100.255")] = 2;
+m[Level3Addr(TETHER_IPV4, "134.214.103.255")] = 3;
+m[Level3Addr(TETHER_IPV4, "134.214.104.1")] = 4;
+m[Level3Addr(TETHER_IPV4, "192.168.0.1")] = 5;
+
+map <Level3Addr, int>::iterator mi;
+for (mi=m.begin() ; mi!=m.end() ; mi++) {
+    cout << mi->first << " ---- " << mi->second << endl;
+}
+}
+
+
+    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.213.0.1"));
+    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.92.2"));
+    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.96.2"));
+    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.100.6"));
+    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.100.255"));
+    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.103.255"));
+    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.104.1"));
+    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "192.168.0.1"));
+
+    return 0;
+}
+
+    ifstream fullview ("full.bgp.txt");
+    hash_full_bgp (fullview);
+
+    cout << "view_ipv4 = (" << view_ipv4.m.size() << ") " << endl
+//	 << view_ipv4 << endl;
+    ;
 
     return capstat (cin, cout);
 
