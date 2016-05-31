@@ -435,8 +435,9 @@ template <typename T> bool desc_comparator_nb (typename map <T, Qualifier>::cons
 }
 
 
-template <typename T> void dump_desc_nb (map <T, Qualifier> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
-    cout << m.size() << " entries" << ", total: " << total.nb << " packets" << endl;
+template <typename T> void dump_desc_nb (const string & tname, map <T, Qualifier> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
+    cout << tname << " repartition : " << m.size() << " " << tname << ", spread over " << total.nb << " packets" << endl;
+    //cout << m.size() << " entries" << ", total: " << total.nb << " packets" << endl;
     if ((m.size() ==0) || (total.nb==0))
 	return;
 
@@ -477,8 +478,9 @@ template <typename T> bool desc_comparator_len (typename map <T, Qualifier>::con
 }
 
 
-template <typename T> void dump_desc_len (map <T, Qualifier> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
-    cout << m.size() << " entries" << ", total: " << total.len << " bytes" << endl;
+template <typename T> void dump_desc_len (const string & tname, map <T, Qualifier> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
+    cout << tname << " repartition : " << m.size() << " " << tname << ", spread over " << total.nb << " bytes" << endl;
+    // cout << m.size() << " entries" << ", total: " << total.len << " bytes" << endl;
     if ((m.size() ==0) || (total.len==0))
 	return;
 
@@ -1004,45 +1006,50 @@ l3dst.applymask (ipv4_mask);
 	}
     }
 
-    {    dump_desc_nb  (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
-    {    dump_desc_len (rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
+    {    dump_desc_nb  ("EtherType", rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
+    {    dump_desc_len ("EtherType", rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_src_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  ("src mac-address", rep_src_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len ("src mac-address", rep_src_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  ("dst mac-address", rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len ("dst mac-address", rep_dst_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  ("src/dst mac-addresses", rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len ("src/dst mac-addresses", rep_pair_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_l3src, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_l3src, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  ("src IP address", rep_l3src, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len ("src IP address", rep_l3src, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_l3dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_l3dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  ("dst IP adress", rep_l3dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len ("dst IP adress", rep_l3dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_l3pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_l3pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  ("src/dst IP addresses", rep_l3pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len ("src/dst IP addresses", rep_l3pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+
+    if (!rep_ip6src.empty()) {
+	if (displayframes) {    dump_desc_nb  ("src IPv6", rep_ip6src, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+	if (displaysizes)  {    dump_desc_len ("src IPv6", rep_ip6src, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    }
 
     if (!rep_ip6dst.empty()) {
-	if (displayframes) {    dump_desc_nb  (rep_ip6dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-	if (displaysizes)  {    dump_desc_len (rep_ip6dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+	if (displayframes) {    dump_desc_nb  ("dst IPv6", rep_ip6dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+	if (displaysizes)  {    dump_desc_len ("dst IPv6", rep_ip6dst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
     }
 
     if (!rep_ip6pair.empty()) {
-	if (displayframes) {    dump_desc_nb  (rep_ip6pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-	if (displaysizes)  {    dump_desc_len (rep_ip6pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+	if (displayframes) {    dump_desc_nb  ("src/dst IPv6", rep_ip6pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+	if (displaysizes)  {    dump_desc_len ("src/dst IPv6", rep_ip6pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
     }
 
-    if (displayframes) {    dump_desc_nb  (rep_ASsrc, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_ASsrc, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  ("src AS", rep_ASsrc, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len ("src AS", rep_ASsrc, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_ASdst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_ASdst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  ("dst AS", rep_ASdst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len ("dst AS", rep_ASdst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
-    if (displayframes) {    dump_desc_nb  (rep_ASpair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
-    if (displaysizes)  {    dump_desc_len (rep_ASpair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displayframes) {    dump_desc_nb  ("src/dst AS", rep_ASpair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len ("src/dst AS", rep_ASpair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 
 
 //    cout << "nb packet = " << nbpacket << endl;
