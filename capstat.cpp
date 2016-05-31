@@ -488,6 +488,8 @@ class Prefix {
 
     Prefix (Prefix const & pr) : a(pr.a), ml(pr.ml) {}
 
+    inline TEthertype gettype (void) { return a.t; }
+
     Prefix (Level3Addr prop_a, int prop_ml, bool lousycreation = false) : a(), ml(-1) {
 	switch (prop_a.t) {
 	    case TETHER_IPV4:
@@ -580,7 +582,18 @@ class HashedPrefixes {
 	m[pr] = AS;
     }
     int getAS (Level3Addr const &a) {
-	Prefix tofind(a, 32);
+	int mask;
+	switch (a.t) {
+	    case TETHER_IPV4:
+		mask = 32;
+		break;
+	    case TETHER_IPV6:
+		mask = 128;
+		break;
+	    default:
+		return 0;
+	}
+	Prefix tofind(a, mask);
 	map <Prefix, size_t>::iterator mi = m.upper_bound (tofind);
 	if (mi!=m.begin())
 	    mi --;
@@ -605,6 +618,7 @@ ostream & operator<< (ostream &out, const HashedPrefixes &h) {
 }
 
 HashedPrefixes view_ipv4;
+HashedPrefixes view_ipv6;
 
 int retrieve_last_as (const string & s) {
     size_t p;
@@ -627,7 +641,8 @@ int retrieve_last_as (const string & s) {
 typedef enum {
     RFV_SEEK_LEGEND,
     RFV_SEEK_EXPLICITPREFIX,
-    RFV_SEEKBESTROUTE
+    RFV_SEEKBESTROUTE,
+    RFV_SEEK_GOODASPATH
 } RFV_State;
 
 void hash_full_bgp (istream &cin) {
@@ -658,6 +673,7 @@ void hash_full_bgp (istream &cin) {
 	    if (p != string::npos) {
 		q = s.find_first_not_of ("0123456789", p);
 		if ((q != string::npos) && (s[q] == '.')) { // it looks like an IPv4 !	
+
 		    Level3Addr prefixbase(TETHER_IPV4, s.substr(p));
 		    q = s.find_first_not_of("0123456789.", p);
 		    if ((q != string::npos) && (s[q] == '/')) {	// it looks like an IPv4 prefix ...
@@ -673,22 +689,77 @@ void hash_full_bgp (istream &cin) {
 				status = RFV_SEEKBESTROUTE;
 			    }
 			}
-			    
 		    }
+
 		} else {
 		    q = s.find_first_not_of ("0123456789abcdefABCDEF", p);
 		    if ((q != string::npos) && (s[q] == ':')) { // it looks like an IPv6 !	
-return;
+
+		    Level3Addr prefixbase(TETHER_IPV6, s.substr(p));
+		    q = s.find_first_not_of("0123456789abcdefABCDEF:", p);
+		    if ((q != string::npos) && (s[q] == '/')) {	// it looks like an IPv4 prefix ...
+			int masklen = atoi (s.substr (q+1).c_str());
+			Prefix prefix(prefixbase, masklen);
+			if (prefix.valid()) {
+			    if (s[2] == '>') {
+				int AS = retrieve_last_as (s);
+				if (AS != -1)
+				    view_ipv6.insert (prefix, AS);
+			    } else {
+				curprefix = prefix;
+				status = RFV_SEEKBESTROUTE;
+			    }
+			}
+		    }
+
+
 		    }
 		}
 	    }
 	    break;
 
 	  case RFV_SEEKBESTROUTE:
+	    // here, maybe we should roll back to previous state if we encounter a new prefix start line ?
 	    if (s[2] == '>') {
+		if ((s.size()<64) || (!isalnum(s[63]))) {
+		    status = RFV_SEEK_GOODASPATH;
+		    break;
+		}
 		int AS = retrieve_last_as (s);
-		if (AS != -1)
-		    view_ipv4.insert (curprefix, AS);
+		if (AS != -1) {
+		    switch (curprefix.gettype()) {
+		      case TETHER_IPV4:
+			view_ipv4.insert (curprefix, AS);
+			break;
+		      case TETHER_IPV6:
+			view_ipv6.insert (curprefix, AS);
+			break;
+		      default:
+			;
+		    }
+		}
+		status = RFV_SEEK_EXPLICITPREFIX;
+	    }
+	    break;
+
+	  case RFV_SEEK_GOODASPATH:
+	    // here, maybe we should roll back to previous state if we encounter a new prefix start line ?
+	    if ((s.size()<65) || (!isalnum(s[64])))
+		break;
+	    else {
+		int AS = retrieve_last_as (s.substr(1));
+		if (AS != -1) {
+		    switch (curprefix.gettype()) {
+		      case TETHER_IPV4:
+			view_ipv4.insert (curprefix, AS);
+			break;
+		      case TETHER_IPV6:
+			view_ipv6.insert (curprefix, AS);
+			break;
+		      default:
+			;
+		    }
+		}
 		status = RFV_SEEK_EXPLICITPREFIX;
 	    }
 	    break;
@@ -705,7 +776,16 @@ void matcher (const Level3Addr &a, ostream &out) {
 	if (AS == 0)
 	    out << a;
 	else
-	    out << a << " (" << AS << ")";
+	    out << a << " (" << setw(6) << AS << ")";
+	break;
+
+      case TETHER_IPV6:
+	AS = view_ipv6.getAS(a);
+	    
+	if (AS == 0)
+	    out << a;
+	else
+	    out << a << " (" << setw(6) << AS << ")";
 	break;
 
       default:
@@ -961,57 +1041,60 @@ int main (int nb, char ** cmde) {
 
 if (false)	// set of basic tests for Prefix maps
 {
-    cerr << "addr = " << Level3Addr(TETHER_IPV4, "134.214.0.0") << endl;
+							cerr << "addr = " << Level3Addr(TETHER_IPV4, "134.214.0.0") << endl;
 
-    Prefix       univ(Level3Addr(TETHER_IPV4, "134.214.0.0"   ), 16),
-	         cism(Level3Addr(TETHER_IPV4, "134.214.100.0" ), 22),
-	     outerbad(Level3Addr(TETHER_IPV4, "134.214.100.0" ), 21),
-	        outer(Level3Addr(TETHER_IPV4, "134.214.96.0"  ), 21),
-	        outerin(Level3Addr(TETHER_IPV4, "134.214.96.0"  ), 22);
+							Prefix       univ(Level3Addr(TETHER_IPV4, "134.214.0.0"   ), 16),
+								     cism(Level3Addr(TETHER_IPV4, "134.214.100.0" ), 22),
+								 outerbad(Level3Addr(TETHER_IPV4, "134.214.100.0" ), 21),
+								    outer(Level3Addr(TETHER_IPV4, "134.214.96.0"  ), 21),
+								    outerin(Level3Addr(TETHER_IPV4, "134.214.96.0"  ), 22);
 
-    view_ipv4.insert(univ,	2200);
-    view_ipv4.insert(cism,	2060);
-    view_ipv4.insert(outerbad,	2200);
-    view_ipv4.insert(outer,	2200);
-    view_ipv4.insert(outerin,	43100);
+							view_ipv4.insert(univ,	2200);
+							view_ipv4.insert(cism,	2060);
+							view_ipv4.insert(outerbad,	2200);
+							view_ipv4.insert(outer,	2200);
+							view_ipv4.insert(outerin,	43100);
 
-cout << "view_ipv4.size = " <<view_ipv4.m.size() << endl;
-cout << view_ipv4 << endl << endl;
+						    cout << "view_ipv4.size = " <<view_ipv4.m.size() << endl;
+						    cout << view_ipv4 << endl << endl;
 
-{
-map <Level3Addr, int> m;
-m[Level3Addr(TETHER_IPV4, "134.214.100.6")] =   1;
-m[Level3Addr(TETHER_IPV4, "134.214.100.255")] = 2;
-m[Level3Addr(TETHER_IPV4, "134.214.103.255")] = 3;
-m[Level3Addr(TETHER_IPV4, "134.214.104.1")] = 4;
-m[Level3Addr(TETHER_IPV4, "192.168.0.1")] = 5;
+						    {
+						    map <Level3Addr, int> m;
+						    m[Level3Addr(TETHER_IPV4, "134.214.100.6")] =   1;
+						    m[Level3Addr(TETHER_IPV4, "134.214.100.255")] = 2;
+						    m[Level3Addr(TETHER_IPV4, "134.214.103.255")] = 3;
+						    m[Level3Addr(TETHER_IPV4, "134.214.104.1")] = 4;
+						    m[Level3Addr(TETHER_IPV4, "192.168.0.1")] = 5;
 
-map <Level3Addr, int>::iterator mi;
-for (mi=m.begin() ; mi!=m.end() ; mi++) {
-    cout << mi->first << " ---- " << mi->second << endl;
-}
-}
+						    map <Level3Addr, int>::iterator mi;
+						    for (mi=m.begin() ; mi!=m.end() ; mi++) {
+							cout << mi->first << " ---- " << mi->second << endl;
+						    }
+						    }
 
 
-    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.213.0.1"));
-    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.92.2"));
-    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.96.2"));
-    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.100.6"));
-    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.100.255"));
-    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.103.255"));
-    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.104.1"));
-    view_ipv4.getAS( Level3Addr(TETHER_IPV4, "192.168.0.1"));
+							view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.213.0.1"));
+							view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.92.2"));
+							view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.96.2"));
+							view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.100.6"));
+							view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.100.255"));
+							view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.103.255"));
+							view_ipv4.getAS( Level3Addr(TETHER_IPV4, "134.214.104.1"));
+							view_ipv4.getAS( Level3Addr(TETHER_IPV4, "192.168.0.1"));
 
-    return 0;
+							return 0;
 }
 
     ifstream fullview ("full.bgp.txt");
     hash_full_bgp (fullview);
 
-    cout << "view_ipv4 = (" << view_ipv4.m.size() << ") " << endl
-//	 << view_ipv4 << endl;
-    ;
+    cout << "view_ipv4 = " << view_ipv4.m.size() << " entries" << endl;
+    cout << "view_ipv6 = " << view_ipv6.m.size() << " entries" << endl;
+
+//    cout << view_ipv6 << endl;
 
     return capstat (cin, cout);
+
+    return 0;
 
 }
