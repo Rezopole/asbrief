@@ -374,6 +374,38 @@ void matcher (const MacPair &p, ostream &out) {
     out << ']';
 }
 
+// --------- ASPair : a pair of AS src / dst ---------------------------------------------------------------------------------------------------
+
+class ASPair {
+  public:
+    int src, dst;
+    ASPair () {}
+    ASPair (int src, int dst) :
+	src(src), dst(dst) {}
+    ASPair (ASPair const & o) : src(o.src), dst(o.dst) {}
+    bool operator< (const ASPair &a) const {
+	if (a.src < src)
+	    return true;
+	else if (src < a.src)
+	    return false;
+	else if (a.dst < dst)
+	    return true;
+	else
+	    return false;
+    }
+};
+ostream &operator<< (ostream &out, const ASPair &p) {
+    return out << "[ " << p.src << " " << p.dst << " ]";
+}
+
+// void matcher (const ASPair &p, ostream &out) {
+//     out << '[';
+//     matcher (p.src, out);
+//     out << " ";
+//     matcher (p.dst, out);
+//     out << ']';
+// }
+
 // --------- Qualifier -------------------------------------------------------------------------------------------------------------------------
 
 class Qualifier {
@@ -809,6 +841,18 @@ void matcher (const Level3Addr &a, ostream &out) {
     }
 }
 
+int getAS (const Level3Addr &a) {
+    switch (a.t) {
+      case TETHER_IPV4:
+	return view_ipv4.getAS(a);
+
+      case TETHER_IPV6:
+	return view_ipv6.getAS(a);
+
+      default:
+	return 0;
+    }
+}
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -824,6 +868,10 @@ map <Level3AddrPair, Qualifier> rep_l3pair;
 map <Level3Addr, Qualifier> rep_ip6src;
 map <Level3Addr, Qualifier> rep_ip6dst;
 map <Level3AddrPair, Qualifier> rep_ip6pair;
+
+map <int, Qualifier> rep_ASsrc;
+map <int, Qualifier> rep_ASdst;
+map <ASPair, Qualifier> rep_ASpair;
 
 map <Ethertype, Qualifier> rep_ethertype;
 
@@ -934,13 +982,19 @@ l3dst.applymask (ipv4_mask);
 		insert_qualifier (rep_ethertype, ethertype, q);
 	    }
 	    if (l3src.valid()) {
+		int ASsrc = getAS(l3src);
 		insert_qualifier (rep_l3src, l3src, q);
+		insert_qualifier (rep_ASsrc, ASsrc, q);
 		if (l3src.t == TETHER_IPV6)
 		    insert_qualifier (rep_ip6src, l3src, q);
 		if (l3dst.valid()) {
+		    int ASdst = getAS(l3dst);
 		    insert_qualifier (rep_l3dst, l3dst, q);
+		    insert_qualifier (rep_ASdst, ASdst, q);
 		    Level3AddrPair pair(l3src, l3dst);
 		    insert_qualifier (rep_l3pair, pair, q);
+		    ASPair aspair (ASsrc, ASdst);
+		    insert_qualifier (rep_ASpair, aspair, q);
 		    if (l3dst.t == TETHER_IPV6) {
 			insert_qualifier (rep_ip6dst, l3dst, q);
 			insert_qualifier (rep_ip6pair, pair, q);
@@ -980,6 +1034,16 @@ l3dst.applymask (ipv4_mask);
 	if (displayframes) {    dump_desc_nb  (rep_ip6pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
 	if (displaysizes)  {    dump_desc_len (rep_ip6pair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
     }
+
+    if (displayframes) {    dump_desc_nb  (rep_ASsrc, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_ASsrc, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+
+    if (displayframes) {    dump_desc_nb  (rep_ASdst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_ASdst, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+
+    if (displayframes) {    dump_desc_nb  (rep_ASpair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+    if (displaysizes)  {    dump_desc_len (rep_ASpair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+
 
 //    cout << "nb packet = " << nbpacket << endl;
 //    cout << "nb src mac = " << rep_src_macaddr.size() << endl;
