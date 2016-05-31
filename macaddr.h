@@ -31,8 +31,9 @@
 using namespace std;
 
 typedef enum {
-    CISCO4MAC,
-    REGULARMAC
+    PACKMAC,	    // 2975e099ad98
+    CISCO4MAC,	    // 2975.e099.ad98
+    REGULARMAC	    // 29:75:e0:99:ad:98
 } Tmactype;
 
 class MacAddr  {
@@ -47,7 +48,7 @@ class MacAddr  {
     MacAddr (uint64_t addr) : addr(addr) {
     }
     MacAddr (const string &s) : addr (0xffffffffffffffff) {
-	if (s.size() < 14) {
+	if (s.size() < 12) {
 	    cerr << "invalid mac-addr (bad length) : " << s << endl;
 	    return;
 	}
@@ -61,8 +62,16 @@ class MacAddr  {
 		if (s[p] == ':') {
 		    mactype = REGULARMAC;
 		} else if (isxdigit (s[p])) {
-		    mactype = CISCO4MAC;
+		    ; //mactype = CISCO4MAC;
 		} else
+		    return;
+	    }
+	    if ((mactype != REGULARMAC) && (n==4)) {
+		if (isxdigit (s[p]))
+		    mactype = PACKMAC;
+		else if (s[p] == '.')
+		    mactype = CISCO4MAC;
+		else
 		    return;
 	    }
 

@@ -24,7 +24,7 @@
 
 #include <iostream>
 #include <iomanip>
-#include <sstream>
+#include <strstream>
 #include <string>
 #include <list>
 #include <map>
@@ -198,7 +198,7 @@ class Level3Addr {
 
 };
 ostream &operator<< (ostream &out, const Level3Addr &a) {
-    stringstream s;
+    strstream s;
     switch (a.t) {
       case TETHER_IPV4:
 	s << (unsigned int)a.b[0] << '.' << (unsigned int)a.b[1] << '.' << (unsigned int)a.b[2] << '.' << (unsigned int)a.b[3];
@@ -210,9 +210,9 @@ ostream &operator<< (ostream &out, const Level3Addr &a) {
 	return out << str;
 	break;
       default:
+	return out << "invalidL3addr";
 	break;
     }
-    return out << "invalidL3addr";
 }
 
 Level3Addr l3mask (int nb) {
@@ -255,7 +255,7 @@ class Level3AddrPair {
     }
 };
 ostream &operator<< (ostream &out, const Level3AddrPair &p) {
-    stringstream s;
+    strstream s;
     s << "[ " << setw(18) << p.src << " " << setw(18) << p.dst << " ]";
     return out << s.str();
 }
