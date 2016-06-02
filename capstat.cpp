@@ -103,8 +103,10 @@ typedef enum {
     TETHER_IPV4,
     TETHER_IPV6,
     TETHER_ARP,
-    TETHER_T8023,
+    TETHER_8023,
+    TETHER_8021Q,
     TETHER_MOPRC,
+    TETHER_LLC,
     TETHER_AOE,
     TETHER_UNKNOWN,
     TETHER_OTHER
@@ -116,14 +118,16 @@ class Ethertype {
     Ethertype () : ethertype (TETHER_UNKNOWN) {};
     Ethertype (const string &s) {
 //cerr << "===================" << s.substr (0,20) << endl;
-	     if (s.find ("ethertype IPv4 (0x0800)") == 0)      ethertype = TETHER_IPV4;
-	else if (s.find ("ethertype IPv6 (0x86dd)") == 0)      ethertype = TETHER_IPV6;
-	else if (s.find ("ethertype ARP (0x0806)") == 0)       ethertype = TETHER_ARP;
-	else if (s.find ("802.3") == 0)                        ethertype = TETHER_T8023;
-	else if (s.find ("ethertype MOP RC (0x6002)") == 0)    ethertype = TETHER_MOPRC;
-	else if (s.find ("ethertype AoE (0x88a2)") == 0)       ethertype = TETHER_AOE;
-	else if (s.find ("ethertype Unknown ") == 0)           ethertype = TETHER_UNKNOWN;
-	else                                                   ethertype = TETHER_OTHER;
+	     if (s.find ("ethertype IPv4") == 0)		ethertype = TETHER_IPV4;
+	else if (s.find ("ethertype IPv6") == 0)		ethertype = TETHER_IPV6;
+	else if (s.find ("ethertype ARP") == 0)			ethertype = TETHER_ARP;
+	else if (s.find ("802.3") == 0)				ethertype = TETHER_8023;
+	else if (s.find ("ethertype 802.1Q") == 0)		ethertype = TETHER_8021Q;
+	else if (s.find ("LLC") == 0)				ethertype = TETHER_LLC;
+	else if (s.find ("ethertype MOP RC") == 0)		ethertype = TETHER_MOPRC;
+	else if (s.find ("ethertype AoE") == 0)			ethertype = TETHER_AOE;
+	else if (s.find ("ethertype Unknown ") == 0)		ethertype = TETHER_UNKNOWN;
+	else							ethertype = TETHER_OTHER;
     }
     Ethertype (const Ethertype &o) : ethertype(o.ethertype) {}
     bool operator< (const Ethertype &a) const {
@@ -135,9 +139,10 @@ ostream &operator<< (ostream &out, const Ethertype &p) {
 	case TETHER_IPV4:    return out << "IPv4";
 	case TETHER_IPV6:    return out << "IPv6";
 	case TETHER_ARP:     return out << "ARP";
-	case TETHER_T8023:   return out << "803.3";
+	case TETHER_8023:    return out << "803.3";
 	case TETHER_MOPRC:   return out << "MOP RC";
 	case TETHER_AOE:     return out << "AoE";
+	case TETHER_8021Q:   return out << "802.1q";
 	case TETHER_UNKNOWN: return out << "Unknown";
 	case TETHER_OTHER:   return out << "Other";
 	default:             return out << "Other";
@@ -910,7 +915,8 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 	do {
 	    string s;
 	    lno++; readline (cin, s);
-	    size_t p;
+	    size_t p, q;
+	    int vlan = -1;
 
 	    switch (state) {
 	      case SEEK_NEXT_PACKET:
@@ -929,14 +935,42 @@ cout << "ipv6mask = " << ipv6mask << endl << endl ;
 				p = s.find (", length ", p+2);
 				if (p != string::npos) {
 				    packetlen = atol (s.substr(p+9, 10).c_str());
-				    if (ethertype.ethertype == TETHER_IPV6) {
-					p = seek_ending_parenthesis (s, p+9);
-					l3src = Level3Addr(TETHER_IPV6, s.substr (p+1));
-					l3src.applymask (ipv6mask);
-					p = s.find (" > ", p);
-					if (p != string::npos) {
-					    l3dst = Level3Addr(TETHER_IPV6, s.substr (p+3));
-					    l3dst.applymask (ipv6mask);
+
+								if (ethertype.ethertype == TETHER_IPV6) {
+								    p = seek_ending_parenthesis (s, p+9);
+								    l3src = Level3Addr(TETHER_IPV6, s.substr (p+1));
+								    l3src.applymask (ipv6mask);
+								    p = s.find (" > ", p);
+								    if (p != string::npos) {
+									l3dst = Level3Addr(TETHER_IPV6, s.substr (p+3));
+									l3dst.applymask (ipv6mask);
+								    }
+
+				    } else if (ethertype.ethertype == TETHER_8021Q) {
+					q = s.find (": vlan ", p+9);
+					if (q != string::npos) {
+					    p = q;
+					    vlan = atoi (s.substr(p+7).c_str());
+					    p = s.find (", ", p+7);
+					    if (p != string::npos) {
+						p = s.find (", ", p+2);
+						ethertype = Ethertype (s.substr (p+2));
+
+								if (ethertype.ethertype == TETHER_IPV6) {
+								    p = seek_ending_parenthesis (s, p+9);
+//cerr << "   lala   ==" << s.substr (p+1) << endl;
+								    l3src = Level3Addr(TETHER_IPV6, s.substr (p+1));
+								    l3src.applymask (ipv6mask);
+								    p = s.find (" > ", p);
+								    if (p != string::npos) {
+									l3dst = Level3Addr(TETHER_IPV6, s.substr (p+3));
+									l3dst.applymask (ipv6mask);
+								    }
+								}
+
+					    }
+					} else {
+					    vlan = 0;
 					}
 				    }
 				}

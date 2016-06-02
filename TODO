@@ -1,5 +1,10 @@
 
 
+ICMP ???
+
+ICMPV6 : dst endress ending with ':' to remove !
+
+
 data sorting and consolidations
     use whois and an inner cache for per-AS repartition
     use a BGP full-view dump for per-AS repartition
@@ -15,4 +20,5 @@ Output
     json-encoded output
     html output
     svg or better ?
+
 
