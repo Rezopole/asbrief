@@ -510,7 +510,7 @@ template <typename T> bool desc_comparator_len (typename map <T, Qualifier>::con
 
 
 template <typename T> void dump_desc_len (const string & tname, map <T, Qualifier> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
-    cout << tname << " repartition : " << m.size() << " " << tname << ", spread over " << total.nb << " bytes" << endl;
+    cout << tname << " repartition : " << m.size() << " " << tname << ", spread over " << total.len << " bytes" << endl;
     // cout << m.size() << " entries" << ", total: " << total.len << " bytes" << endl;
     if ((m.size() ==0) || (total.len==0))
 	return;
@@ -739,9 +739,13 @@ typedef enum {
 
 void hash_full_bgp (istream &cin) {
     RFV_State status = RFV_SEEK_LEGEND;
+    map <int, int> IP4ases, IP6ases, ases;
 
     size_t lno = 0;
     Prefix curprefix;
+
+    cout << "reading full view ... " ;
+    cout.flush();
 
     while (cin) {
 	string s;
@@ -774,8 +778,11 @@ void hash_full_bgp (istream &cin) {
 			if (prefix.valid()) {
 			    if (s[2] == '>') {
 				int AS = retrieve_last_as (s);
-				if (AS != -1)
+				if (AS != -1) {
 				    view_ipv4.insert (prefix, AS);
+				    IP4ases [AS] = 1;
+				    ases [AS] = 1;
+				}
 			    } else {
 				curprefix = prefix;
 				status = RFV_SEEKBESTROUTE;
@@ -795,8 +802,11 @@ void hash_full_bgp (istream &cin) {
 			if (prefix.valid()) {
 			    if (s[2] == '>') {
 				int AS = retrieve_last_as (s);
-				if (AS != -1)
+				if (AS != -1) {
 				    view_ipv6.insert (prefix, AS);
+				    IP6ases [AS] = 1;
+				    ases [AS] = 1;
+				}
 			    } else {
 				curprefix = prefix;
 				status = RFV_SEEKBESTROUTE;
@@ -822,9 +832,13 @@ void hash_full_bgp (istream &cin) {
 		    switch (curprefix.gettype()) {
 		      case TETHER_IPV4:
 			view_ipv4.insert (curprefix, AS);
+			IP4ases [AS] = 1;
+			ases [AS] = 1;
 			break;
 		      case TETHER_IPV6:
 			view_ipv6.insert (curprefix, AS);
+			IP6ases [AS] = 1;
+			ases [AS] = 1;
 			break;
 		      default:
 			;
@@ -844,9 +858,13 @@ void hash_full_bgp (istream &cin) {
 		    switch (curprefix.gettype()) {
 		      case TETHER_IPV4:
 			view_ipv4.insert (curprefix, AS);
+			IP4ases [AS] = 1;
+			ases [AS] = 1;
 			break;
 		      case TETHER_IPV6:
 			view_ipv6.insert (curprefix, AS);
+			IP6ases [AS] = 1;
+			ases [AS] = 1;
 			break;
 		      default:
 			;
@@ -857,6 +875,10 @@ void hash_full_bgp (istream &cin) {
 	    break;
 	}
     }
+
+    cout << " done. " << view_ipv4.m.size() << " IPv4 prefixes (" << IP4ases.size()<< " AS), "
+	 << view_ipv6.m.size() << " IPv6 prefixes (" << IP6ases.size()<< " AS).   total :  " << ases.size() << " AS" << endl;
+    
 }
 
 void matcher (const Level3Addr &a, ostream &out) {
@@ -1136,17 +1158,24 @@ void usage (ostream &cout, char *cmde0) {
     cout << "usage :  " << cmde0 << " [-h|--help] [--ceil=xx%] [--sizes] [--frames] [--sizes+frames (default)]" << endl
          << "                  [--mask=(0-32)] [--nomask]" << endl
          << "                  [--ipv4mask=(0-32)] [--ipv6mask=(0-128)]" << endl
+         << "                  [--fullview=fname ]" << endl
 	 << endl;
 }
 
 int main (int nb, char ** cmde) {
 
     int i;
+
+    string fullviewfname;  //  ("full.bgp.txt");
+
     for (i=1 ; i<nb ; i++) {
 	if (cmde[i][0] == '-') {
 	    if ((strcmp (cmde[i], "--help") == 0) || (strcmp (cmde[i], "-h") ==0)) {
 		usage (cout, cmde[0]);
 		return 0;
+	    }
+	    if (strncmp (cmde[i], "--fullview=", 11) == 0) {
+		fullviewfname = cmde[i]+11;
 	    }
 	    if (strcmp (cmde[i], "--sizes") == 0) {
 		displaysizes = true;
@@ -1243,11 +1272,15 @@ if (false)	// set of basic tests for Prefix maps
 							return 0;
 }
 
-    ifstream fullview ("full.bgp.txt");
-    hash_full_bgp (fullview);
-
-    cout << "view_ipv4 = " << view_ipv4.m.size() << " entries" << endl;
-    cout << "view_ipv6 = " << view_ipv6.m.size() << " entries" << endl;
+    if (!fullviewfname.empty()) {
+	ifstream fullview (fullviewfname.c_str());
+	if (!fullview) {
+	    int e = errno;
+	    cerr << "could not read full-view file : " << fullviewfname << " : " << strerror (e) << endl;
+	}
+	else
+	    hash_full_bgp (fullview);
+    }
 
 //    cout << view_ipv6 << endl;
 
