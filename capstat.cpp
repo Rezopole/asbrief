@@ -40,6 +40,8 @@
 
 #include "readline.h"
 
+#include "fmtstream.h"
+
 
 using namespace std;
 using namespace stdjd;
@@ -95,6 +97,23 @@ void matcher (const MacAddr &m, ostream &out) {
 	out << m;
     else
 	out << mi->second << " (" << m << ")";
+}
+
+// --------- AS (autonomous System) ------------------------------------------------------------------------------------------------------------
+
+class AS {
+  public:
+    int as;
+
+    AS (void) : as (-1) {}
+    AS (int as) : as(as) {}
+    AS (const AS &a) : as(a.as) {}
+    bool operator< (const AS &a) const {
+	return as < a.as;
+    }
+};
+ostream &operator<< (ostream &out, const AS &a) {
+    return out << "(as" << a.as << ")";
 }
 
 // --------- Ethertype -------------------------------------------------------------------------------------------------------------------------
@@ -335,15 +354,15 @@ class Level3AddrPair {
 };
 ostream &operator<< (ostream &out, const Level3AddrPair &p) {
     stringstream s;
-    s << "[ " << setw(18) << p.src << " " << setw(18) << p.dst << " ]";
+    s << "[ " << p.src << "\t-" <<  p.dst << "\t+]";
     return out << s.str();
 }
 void matcher (const Level3AddrPair &p, ostream &out) {
-    out << '[';
+    out << "[ ";
     matcher (p.src, out);
-    out << " ";
+    out << "\t-";
     matcher (p.dst, out);
-    out << ']';
+    out << "\t+]";
 }
 
 
@@ -368,7 +387,7 @@ class MacPair {
     }
 };
 ostream &operator<< (ostream &out, const MacPair &p) {
-    return out << "[ " << p.src << " " << p.dst << " ]";
+    return out << "[ " << p.src << "\t-" << p.dst << "\t+]";
 }
 
 void matcher (const MacPair &p, ostream &out) {
@@ -383,9 +402,9 @@ void matcher (const MacPair &p, ostream &out) {
 
 class ASPair {
   public:
-    int src, dst;
+    AS src, dst;
     ASPair () {}
-    ASPair (int src, int dst) :
+    ASPair (AS src, AS dst) :
 	src(src), dst(dst) {}
     ASPair (ASPair const & o) : src(o.src), dst(o.dst) {}
     bool operator< (const ASPair &a) const {
@@ -400,7 +419,7 @@ class ASPair {
     }
 };
 ostream &operator<< (ostream &out, const ASPair &p) {
-    return out << "[ " << p.src << " " << p.dst << " ]";
+    return out << "[ " << p.src << "\t-" << p.dst << "\t+]";
 }
 
 // void matcher (const ASPair &p, ostream &out) {
@@ -432,7 +451,7 @@ class Qualifier {
 // --------- desc_[nb/len] Templates for map<T,Qualifier> types --------------------------------------------------------------------------------
 
 template <typename T> void matcher (const T &a, ostream &out) {
-    out << "    [" << a << "]    " ;
+    out << a ;
 }
 
 template <typename T> bool desc_comparator_nb (typename map <T, Qualifier>::const_iterator mi1, typename map <T, Qualifier>::const_iterator mi2) {
@@ -454,28 +473,35 @@ template <typename T> void dump_desc_nb (const string & tname, map <T, Qualifier
 
     l.sort (desc_comparator_nb<T>);
 
-    int maxw = (int)(log2((*(l.begin()))->second.nb) / log2(10)) + 1;
-    int nw = (int)(log2(l.size()) / log2(10)) + 1;
+//    int maxw = (int)(log2((*(l.begin()))->second.nb) / log2(10)) + 1;
+//    int nw = (int)(log2(l.size()) / log2(10)) + 1;
     size_t n = 0;
     size_t curtot = 0;
     typename list <typename map <T, Qualifier>::const_iterator>::const_iterator li;
 
+    NSTabulatedOut::TabulatedOut tabul (cout);
+
     for (li=l.begin() ; li!=l.end() ; li++) {
+	stringstream buf;
+
 	curtot += (*li)->second.nb;
 	n++;
-	cout << setw(nw)   << n << " ";
+
+	buf << n << "\t+";
 	if (matched) {
-	    cout << setw(45);
-	    matcher((*li)->first, cout);
-	    cout << " ";
-	} else
-	     cout << setw(18)   << (*li)->first << " ";
-	cout << setw(maxw) << (*li)->second.nb << " "
-	     << setw(3)    << (100*(*li)->second.nb)/total.nb << "% "
-	     << setw(3)    << (100*curtot)/total.nb << "%"
-	     << endl;
+	    matcher((*li)->first, buf);
+	    buf << "\t-";
+	} else {
+	    buf << (*li)->first << "\t-";
+	}
+
+	buf << (*li)->second.nb << "\t+"
+	     << (100*(*li)->second.nb)/total.nb << "%\t+"
+	     << (100*curtot)/total.nb << "%\t+";
+	tabul.push_back (buf.str());
 	if ((double)curtot/(double)total.nb > ceil) break;
     }
+    tabul.flush();
 }
 
 template <typename T> bool desc_comparator_len (typename map <T, Qualifier>::const_iterator mi1, typename map <T, Qualifier>::const_iterator mi2) {
@@ -497,28 +523,39 @@ template <typename T> void dump_desc_len (const string & tname, map <T, Qualifie
 
     l.sort (desc_comparator_len<T>);
 
-    int maxw = (int)(log2((*(l.begin()))->second.len) / log2(10)) + 1;
-    int nw = (int)(log2(l.size()) / log2(10)) + 1;
+//    int maxw = (int)(log2((*(l.begin()))->second.len) / log2(10)) + 1;
+//    int nw = (int)(log2(l.size()) / log2(10)) + 1;
     size_t n = 0;
     size_t curtot = 0;
     typename list <typename map <T, Qualifier>::const_iterator>::const_iterator li;
 
+    NSTabulatedOut::TabulatedOut tabul (cout);
+
     for (li=l.begin() ; li!=l.end() ; li++) {
+	stringstream buf;
+
 	curtot += (*li)->second.len;
 	n++;
-	cout << setw(nw)   << n << " " ;
+
+	buf << n << "\t+";
 	if (matched) {
-	    cout << setw(45);
-	    matcher((*li)->first, cout);
-	    cout << " ";
-	} else
-	     cout << setw(18)   << (*li)->first << " ";
-	cout << setw(maxw) << (*li)->second.len << " "
-	     << setw(3)    << (100*(*li)->second.len)/total.len << "% "
-	     << setw(3)    << (100*curtot)/total.len << "%"
-	     << endl;
+	    matcher((*li)->first, buf);
+	    buf << "\t-";
+	} else {
+	    buf << (*li)->first << "\t-";
+	}
+
+//	cout << setw(maxw) << (*li)->second.len << " "
+//	     << setw(3)    << (100*(*li)->second.len)/total.len << "% "
+//	     << setw(3)    << (100*curtot)/total.len << "%"
+//	     << endl;
+	buf << (*li)->second.len << "\t+"
+	     << (100*(*li)->second.len)/total.len << "%\t+"
+	     << (100*curtot)/total.len << "%\t+";
+	tabul.push_back (buf.str());
 	if ((double)curtot/(double)total.len > ceil) break;
     }
+    tabul.flush();
 }
 
 // --------- insert_qualifier templates --------------------------------------------------------------------------------------------------------
@@ -831,7 +868,7 @@ void matcher (const Level3Addr &a, ostream &out) {
 	if (AS == 0)
 	    out << a;
 	else
-	    out << a << " (" << setw(6) << AS << ")";
+	    out << a << " (as" << AS << ")";
 	break;
 
       case TETHER_IPV6:
@@ -840,7 +877,7 @@ void matcher (const Level3Addr &a, ostream &out) {
 	if (AS == 0)
 	    out << a;
 	else
-	    out << a << " (" << setw(6) << AS << ")";
+	    out << a << " (as" << AS << ")";
 	break;
 
       default:
@@ -876,8 +913,8 @@ map <Level3Addr, Qualifier> rep_ip6src;
 map <Level3Addr, Qualifier> rep_ip6dst;
 map <Level3AddrPair, Qualifier> rep_ip6pair;
 
-map <int, Qualifier> rep_ASsrc;
-map <int, Qualifier> rep_ASdst;
+map <AS, Qualifier> rep_ASsrc;
+map <AS, Qualifier> rep_ASdst;
 map <ASPair, Qualifier> rep_ASpair;
 
 map <Ethertype, Qualifier> rep_ethertype;
@@ -1018,13 +1055,13 @@ l3dst.applymask (ipv4_mask);
 		insert_qualifier (rep_ethertype, ethertype, q);
 	    }
 	    if (l3src.valid()) {
-		int ASsrc = getAS(l3src);
+		AS ASsrc = getAS(l3src);
 		insert_qualifier (rep_l3src, l3src, q);
 		insert_qualifier (rep_ASsrc, ASsrc, q);
 		if (l3src.t == TETHER_IPV6)
 		    insert_qualifier (rep_ip6src, l3src, q);
 		if (l3dst.valid()) {
-		    int ASdst = getAS(l3dst);
+		    AS ASdst = getAS(l3dst);
 		    insert_qualifier (rep_l3dst, l3dst, q);
 		    insert_qualifier (rep_ASdst, ASdst, q);
 		    Level3AddrPair pair(l3src, l3dst);
