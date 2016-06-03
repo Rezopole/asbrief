@@ -4,21 +4,24 @@ ICMP ???
 
 ICMPV6 : dst endress ending with ':' to remove !
 
+ergonomy
+	    provide an inner piped-call for tcpdump rather than guessing the proper pipe ?
 
 data sorting and consolidations
-    use whois and an inner cache for per-AS repartition
-    use a BGP full-view dump for per-AS repartition
-    use a mac-address registry for human-clarifyed output (iptraf format ?)
+            use whois and an inner cache for per-AS repartition
+    [done]  use a BGP full-view dump for per-AS repartition
+    [~done] use a mac-address registry for human-clarifyed output (iptraf format ?)
+	    use timestamps in order to output average rates ???
 
 command flags
-    toggle between packet number views or packet size views
+    [done]  toggle between packet number views or packet size views
 
 Unit Testings
-    provide aneutral and rather exhaustive capture for unit-testings
+            provide aneutral and rather exhaustive capture for unit-testings
 
 Output
-    json-encoded output
-    html output
-    svg or better ?
+	    json-encoded output
+	    html output
+	    svg or better ?
 
 
