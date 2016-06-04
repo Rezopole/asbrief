@@ -44,14 +44,14 @@ namespace NSTabulatedOut {
 
 	void flush (void) {
 	    list<string>::iterator li;
-	    list<int> tab;
+	    list<size_t> tab;
 
 	    for (li=ls.begin() ; li!=ls.end() ; li++) {
 		string const &s = *li;
 		size_t p, q,
 		       tabsize,
 		       l = s.size();
-		list<int>::iterator lti = tab.begin();
+		list<size_t>::iterator lti = tab.begin();
 		for (p=0 ; p<l ; ) {
 		    q = s.find ('\t', p);
 		    if (q == string::npos)
@@ -79,7 +79,7 @@ namespace NSTabulatedOut {
 		string const &s = *li;
 		size_t p, q,
 		       l = s.size();
-		list<int>::iterator lti = tab.begin();
+		list<size_t>::iterator lti = tab.begin();
 		for (p=0 ; p<l ; ) {
 		    q = s.find ('\t', p);
 		    if (q == string::npos) {
