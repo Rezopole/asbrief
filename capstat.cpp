@@ -112,8 +112,15 @@ class AS {
 	return as < a.as;
     }
 };
+
+map <int, string> ASdesc;
+
 ostream &operator<< (ostream &out, const AS &a) {
-    return out << "(as" << a.as << ")";
+    map <int, string>::const_iterator mi = ASdesc.find (a.as);
+    if (mi!=ASdesc.end())
+	return out << "(" << mi->second << " as" << a.as << ")";
+    else
+	return out << "(as" << a.as << ")";
 }
 
 // --------- Ethertype -------------------------------------------------------------------------------------------------------------------------
@@ -718,12 +725,14 @@ int retrieve_last_as (const string & s) {
 	return -1;
     p = s.rfind (' ');
     if (p == string::npos) return -1;
+    if (p < 62) return -1;
     int AS = atoi (s.substr(p+1).c_str());
     if (AS != 0) return AS;
     if (p == 0) return -1;
 
     p = s.rfind (' ', p-1);
     if (p == string::npos) return -1;
+    if (p < 62) return -1;
     AS = atoi (s.substr(p+1).c_str());
     if (AS != 0) return AS;
 
@@ -881,25 +890,41 @@ void hash_full_bgp (istream &cin) {
     
 }
 
+void hash_asnlist (istream &cin) {
+    size_t lno = 0;
+    while (cin) {
+	string s;
+	lno++; readline (cin, s);
+	size_t p;
+
+	p = s.find (';');
+	if (p == string::npos) continue;
+	if (s.size() <= p+1) continue;
+	int as = atoi (s.substr(0, p).c_str());
+	if (as>0)
+	    ASdesc [as] = s.substr(p+1);
+    }
+}
+
 void matcher (const Level3Addr &a, ostream &out) {
-    int AS = 0;
+    AS as = 0;
     switch (a.t) {
       case TETHER_IPV4:
-	AS = view_ipv4.getAS(a);
+	as = view_ipv4.getAS(a);
 	    
-	if (AS == 0)
+	if (as.as == 0)
 	    out << a;
 	else
-	    out << a << " (as" << AS << ")";
+	    out << a << as;
 	break;
 
       case TETHER_IPV6:
-	AS = view_ipv6.getAS(a);
+	as = view_ipv6.getAS(a);
 	    
-	if (AS == 0)
+	if (as.as == 0)
 	    out << a;
 	else
-	    out << a << " (as" << AS << ")";
+	    out << a << as;
 	break;
 
       default:
@@ -1282,7 +1307,9 @@ if (false)	// set of basic tests for Prefix maps
 	    hash_full_bgp (fullview);
     }
 
-//    cout << view_ipv6 << endl;
+    {	ifstream asnlist("asn.list");
+	hash_asnlist (asnlist);
+    }
 
     return capstat (cin, cout);
 
