@@ -398,11 +398,11 @@ ostream &operator<< (ostream &out, const MacPair &p) {
 }
 
 void matcher (const MacPair &p, ostream &out) {
-    out << '[';
+    out << "[ ";
     matcher (p.src, out);
-    out << " ";
+    out << "\t-";
     matcher (p.dst, out);
-    out << ']';
+    out << "\t+]";
 }
 
 // --------- ASPair : a pair of AS src / dst ---------------------------------------------------------------------------------------------------
