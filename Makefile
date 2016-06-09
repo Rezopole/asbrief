@@ -9,8 +9,10 @@ vimtest: capstat
 
 capstat: capstat.cpp macaddr.h readline.h fmtstream.h
 	g++ -Wall -o capstat capstat.cpp
-	# MacOS :  to dig out some bugs, the aithor sometime use this below instead :
-	# g++ -stdlib=libstdc++ -Wall -o capstat capstat.cpp
+
+capstat.macos: capstat.cpp macaddr.h readline.h fmtstream.h
+	# MacOS :  to dig out some bugs, the author sometime use this below instead :
+	g++ -stdlib=libstdc++ -Wall -o capstat capstat.cpp
 
 testtabul: testtabul.cpp fmtstream.h
 	g++ -Wall -o testtabul testtabul.cpp

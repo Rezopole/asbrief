@@ -1,5 +1,9 @@
 
-BUG !    verify prefix inclusion matching into getAS procedure !!!
+BUG !
+    [done]   verify prefix inclusion matching into getAS procedure !!!
+    [done]   be classful-IPv4 aware and behave accordingly for full-view parsing
+
+             introduce RF1918 privates spaces ...
 
 
 ICMP ???
@@ -10,6 +14,9 @@ ergonomy
 	    provide an inner piped-call for tcpdump rather than guessing the proper pipe ?
 
 data sorting and consolidations
+            read _All_ prefixes as-path and not only the _Bests_.
+            check for multiple-AS appartainances (?)
+            retrieve the full view via snmp ??
             use whois and an inner cache for per-AS repartition
     [done]  use a BGP full-view dump for per-AS repartition
     [~done] use a mac-address registry for human-clarifyed output (iptraf format ?)
@@ -19,7 +26,7 @@ command flags
     [done]  toggle between packet number views or packet size views
 
 Unit Testings
-            provide aneutral and rather exhaustive capture for unit-testings
+            provide a neutral and rather exhaustive capture for unit-testings
 
 Output
 	    json-encoded output

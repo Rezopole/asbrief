@@ -578,18 +578,39 @@ template <typename T> void insert_qualifier (map <T, Qualifier> &m, T const &key
 // --------- hash full view --------------------------------------------------------------------------------------------------------------------
 
 
+class Prefix;
+
 class Prefix {
   public:
     Level3Addr a;   // start address
     int ml;	    // mask len, -1 == invalid prefix
+    mutable Prefix const *parent;
+    mutable int as;	    // le numero d'as ...
 
-    Prefix (void) : a(), ml(-1) {}
+    Prefix (void) : a(), ml(-1), parent(NULL), as(-1) {}
 
-    Prefix (Prefix const & pr) : a(pr.a), ml(pr.ml) {}
+    Prefix (Prefix const & pr) : a(pr.a), ml(pr.ml), parent(NULL), as(pr.as) {}
+
+    inline void setparent (Prefix const &p) const {
+	parent = &p;
+    }
+
+    inline void setas (int new_as) const {
+	as = new_as;
+    }
 
     inline TEthertype gettype (void) { return a.t; }
 
-    Prefix (Level3Addr prop_a, int prop_ml, bool lousycreation = false) : a(), ml(-1) {
+    inline bool contain (const Prefix &p) const {
+	Level3Addr b = p.a;
+	b.applymask (ml);
+	if ((a == b) && (ml <= p.ml))
+	    return true;
+	else 
+	    return false;
+    }
+
+    Prefix (Level3Addr prop_a, int prop_ml, bool lousycreation = false) : a(), ml(-1), as(-1) {
 	switch (prop_a.t) {
 	    case TETHER_IPV4:
 		if ((prop_ml <0) || (prop_ml>32)) {
@@ -658,15 +679,19 @@ ostream &operator<< (ostream &out, const Prefix &pr) {
     return out << pr.a << "/" << pr.ml;
 }
 
+
 class HashedPrefixes {
   public:
-    map <Prefix, size_t> m;
+
+    map <Prefix, int> m;
+
     HashedPrefixes () {
 	/// Level3Addr zero(TETHER_IPV6, "0::");
 	Level3Addr zero(TETHER_IPV4, "0.0.0.0");
 	Prefix All (zero, 0);
 	m[All] = 0;
     }
+
     void insert (Prefix const &pr, int AS) {
 	if (pr.invalid()) return;
 //	map <Prefix, size_t>::iterator mi = m.upper_bound (pr);
@@ -679,6 +704,22 @@ class HashedPrefixes {
 //	    return;
 //	}
 	m[pr] = AS;
+    }
+    void reparent (void) {
+	map <Prefix, int>::iterator mi, mj;
+
+	for (mi=m.begin() ; mi!=m.end() ; mi++) {
+	    mi->first.setas (mi->second);
+	    mj=mi;
+	    for (mj++ ; mj!=m.end() ; mj++) {
+		if (mi->first.contain (mj->first)) {
+// if (mi->first.ml > 0)
+// cerr << mi->first << " is parent of " << mj->first << endl;
+		    mj->first.setparent (mi->first);
+		} else
+		    break;
+	    }
+	}
     }
     int getAS (Level3Addr const &a) {
 	int mask;
@@ -693,23 +734,62 @@ class HashedPrefixes {
 		return 0;
 	}
 	Prefix tofind(a, mask);
-	map <Prefix, size_t>::iterator mi = m.upper_bound (tofind);
-	if (mi!=m.begin())
-	    mi --;
-////////	if (mi == m.end()) { // this should not occur since we've pushed an initial all-match-prefix
-////////	    cerr << "HashedPrefixes::insert : \"Houston, we have a problem !\" : no upper bound found pr=" << a << " as prefix " << tofind << endl;
-////////	    return -1;
-////////	}
-//	if (mi->first == pr) { // we've got a duplicate ?? 
-//	    cerr << "HashedPrefixes::insert : duplicate prefix : " << pr << endl;
-//	    return;
-//	}
-//cerr << "   getAS(" << a << ") = " << mi->first << " = " << mi->second << endl;
-	return mi->second;
+	map <Prefix, int>::iterator mi = m.upper_bound (tofind);
+////		if (mi!=m.begin())
+////		    mi --;
+////	////////	if (mi == m.end()) { // this should not occur since we've pushed an initial all-match-prefix
+////	////////	    cerr << "HashedPrefixes::insert : \"Houston, we have a problem !\" : no upper bound found pr=" << a << " as prefix " << tofind << endl;
+////	////////	    return -1;
+////	////////	}
+////	//	if (mi->first == pr) { // we've got a duplicate ?? 
+////	//	    cerr << "HashedPrefixes::insert : duplicate prefix : " << pr << endl;
+////	//	    return;
+////	//	}
+////	//cerr << "   getAS(" << a << ") = " << mi->first << " = " << mi->second << endl;
+////		Level3Addr b = a;
+////		b.applymask (mi->first.ml);
+////		if (b == mi->first.a)
+////		    return mi->second;
+////		else {
+////	cerr << "getAS : " << a << " not into " << mi->first << endl;
+////		    return -1;
+////		}
+
+	// version qui march en arriere de prefix en prefix jusqu'au debut ...
+if (false) {
+	if (mi==m.begin()) return mi->second;
+	mi --;
+
+	while ((mi!=m.begin()) && ((mi->first.a < a) || (mi->first.a == a))) {
+	    Level3Addr b = a;
+	    b.applymask (mi->first.ml);
+	    if (b == mi->first.a)
+		return mi->second;
+	    mi--;
+	}
+	
+cerr << "getAS : " << a << " not into " << mi->first << endl;
+	return -1;
+} else {
+	if (mi==m.begin()) return mi->second;
+	mi --;
+	// version qui remonte de parent en parent en subnets imbriqués
+	Prefix const * pp = &mi->first;
+
+	while (pp != NULL) {
+	    if (pp->contain (tofind))
+		return pp->as;
+	    else
+		pp = pp->parent;
+	}
+	if (pp == NULL)
+	    return -2;
+	return -3;
+}
     }
 };
 ostream & operator<< (ostream &out, const HashedPrefixes &h) {
-    map <Prefix, size_t>::const_iterator mi;
+    map <Prefix, int>::const_iterator mi;
     for (mi=h.m.begin() ; mi!=h.m.end() ; mi++) {
 	out << "   m[" << mi->first << "] = " << mi->second << endl;
     }
@@ -781,8 +861,29 @@ void hash_full_bgp (istream &cin) {
 
 		    Level3Addr prefixbase(TETHER_IPV4, s.substr(p));
 		    q = s.find_first_not_of("0123456789.", p);
-		    if ((q != string::npos) && (s[q] == '/')) {	// it looks like an IPv4 prefix ...
-			int masklen = atoi (s.substr (q+1).c_str());
+		    if ((q != string::npos) && ((s[q] == '/') || (s[q] == ' '))) {	// it looks like an IPv4 prefix ...
+			int masklen;
+			if (s[q] == '/')
+			    masklen = atoi (s.substr (q+1).c_str());
+			else {
+static Level3Addr firstclassB (TETHER_IPV4, "128.0.0.0");
+static Level3Addr firstclassC (TETHER_IPV4, "192.0.0.0");
+static Level3Addr firstclassD (TETHER_IPV4, "224.0.0.0");
+static Level3Addr firstclassE (TETHER_IPV4, "240.0.0.0");
+			    if (prefixbase < firstclassB)
+				masklen = 8;
+			    else if (prefixbase < firstclassC)
+				masklen = 16;
+			    else if (prefixbase < firstclassD)
+				masklen = 24;
+			    else if (prefixbase < firstclassE) {
+				masklen = 32;
+cerr << "hash_full_bgp : we have a ClassD prefix : " << prefixbase << " ??" << endl;
+			    } else {
+				masklen = 32;
+cerr << "hash_full_bgp : we have a ClassE prefix : " << prefixbase << " ??" << endl;
+			    }
+			}
 			Prefix prefix(prefixbase, masklen);
 			if (prefix.valid()) {
 			    if (s[2] == '>') {
@@ -1303,8 +1404,11 @@ if (false)	// set of basic tests for Prefix maps
 	    int e = errno;
 	    cerr << "could not read full-view file : " << fullviewfname << " : " << strerror (e) << endl;
 	}
-	else
+	else {
 	    hash_full_bgp (fullview);
+	    view_ipv4.reparent();
+	    view_ipv6.reparent();
+	}
     }
 
     {	ifstream asnlist("asn.list");
