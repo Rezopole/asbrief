@@ -12,6 +12,7 @@ ICMPV6 : dst endress ending with ':' to remove !
 
 ergonomy
 	    provide an inner piped-call for tcpdump rather than guessing the proper pipe ?
+	    man pages, examples
 
 data sorting and consolidations
             read _All_ prefixes as-path and not only the _Bests_.
