@@ -2,6 +2,7 @@
 BUG !
     [done]   verify prefix inclusion matching into getAS procedure !!!
     [done]   be classful-IPv4 aware and behave accordingly for full-view parsing
+             introduce a default local AS for locally announced prefix (empty AS-paths)
 
              introduce RF1918 privates spaces ...
 
