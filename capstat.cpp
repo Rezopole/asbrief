@@ -455,26 +455,38 @@ class Qualifier {
     }
 };
 
+
+// --------- mapped T / Qualifier template -----------------------------------------------------------------------------------------------------
+
+template <typename T>
+class MappedQualifier : public map <T, Qualifier> {
+  public:
+    Qualifier localtotal;
+
+    MappedQualifier (void) : localtotal() {}
+};
+
+
 // --------- desc_[nb/len] Templates for map<T,Qualifier> types --------------------------------------------------------------------------------
 
 template <typename T> void matcher (const T &a, ostream &out) {
     out << a ;
 }
 
-template <typename T> bool desc_comparator_nb (typename map <T, Qualifier>::const_iterator mi1, typename map <T, Qualifier>::const_iterator mi2) {
+template <typename T> bool desc_comparator_nb (typename MappedQualifier<T>::const_iterator mi1, typename MappedQualifier<T>::const_iterator mi2) {
     return mi1->second.nb > mi2->second.nb;
 }
 
 
-template <typename T> void dump_desc_nb (const string & tname, map <T, Qualifier> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
-    cout << tname << " repartition : " << m.size() << " " << tname << ", spread over " << total.nb << " packets" << endl;
-    //cout << m.size() << " entries" << ", total: " << total.nb << " packets" << endl;
-    if ((m.size() ==0) || (total.nb==0))
+template <typename T> void dump_desc_nb (const string & tname, MappedQualifier<T> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
+    cout << tname << " repartition : " << m.size() << " " << tname << ", spread over " << m.localtotal.nb << " packets" << endl;
+    //cout << m.size() << " entries" << ", total: " << m.localtotal.nb << " packets" << endl;
+    if ((m.size() ==0) || (m.localtotal.nb==0))
 	return;
 
 
-    list <typename map <T, Qualifier>::const_iterator> l;
-    typename map <T, Qualifier>::const_iterator mi;
+    list <typename MappedQualifier<T>::const_iterator> l;
+    typename MappedQualifier<T>::const_iterator mi;
     for (mi=m.begin() ; mi!=m.end() ; mi++)
 	l.push_back (mi);
 
@@ -484,7 +496,7 @@ template <typename T> void dump_desc_nb (const string & tname, map <T, Qualifier
 //    int nw = (int)(log2(l.size()) / log2(10)) + 1;
     size_t n = 0;
     size_t curtot = 0;
-    typename list <typename map <T, Qualifier>::const_iterator>::const_iterator li;
+    typename list <typename MappedQualifier<T>::const_iterator>::const_iterator li;
 
     NSTabulatedOut::TabulatedOut tabul (cout);
 
@@ -503,28 +515,32 @@ template <typename T> void dump_desc_nb (const string & tname, map <T, Qualifier
 	}
 
 	buf << (*li)->second.nb << "\t+"
+	     << (100*(*li)->second.nb)/m.localtotal.nb << "%\t+"
+	     << (100*curtot)/m.localtotal.nb << "%\t+"
+	     << " ("
 	     << (100*(*li)->second.nb)/total.nb << "%\t+"
-	     << (100*curtot)/total.nb << "%\t+";
+	     << (100*curtot)/total.nb << "%\t+"
+	     << " grand-total)";
 	tabul.push_back (buf.str());
-	if ((double)curtot/(double)total.nb > ceil) break;
+	if ((double)curtot/(double)m.localtotal.nb > ceil) break;
     }
     tabul.flush();
 }
 
-template <typename T> bool desc_comparator_len (typename map <T, Qualifier>::const_iterator mi1, typename map <T, Qualifier>::const_iterator mi2) {
+template <typename T> bool desc_comparator_len (typename MappedQualifier<T>::const_iterator mi1, typename MappedQualifier<T>::const_iterator mi2) {
     return mi1->second.len > mi2->second.len;
 }
 
 
-template <typename T> void dump_desc_len (const string & tname, map <T, Qualifier> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
-    cout << tname << " repartition : " << m.size() << " " << tname << ", spread over " << total.len << " bytes" << endl;
-    // cout << m.size() << " entries" << ", total: " << total.len << " bytes" << endl;
-    if ((m.size() ==0) || (total.len==0))
+template <typename T> void dump_desc_len (const string & tname, MappedQualifier<T> const &m, ostream &cout, Qualifier total, bool matched=false, double ceil=1.0) {
+    cout << tname << " repartition : " << m.size() << " " << tname << ", spread over " << m.localtotal.len << " bytes" << endl;
+    // cout << m.size() << " entries" << ", total: " << m.localtotal.len << " bytes" << endl;
+    if ((m.size() ==0) || (m.localtotal.len==0))
 	return;
 
 
-    list <typename map <T, Qualifier>::const_iterator> l;
-    typename map <T, Qualifier>::const_iterator mi;
+    list <typename MappedQualifier<T>::const_iterator> l;
+    typename MappedQualifier<T>::const_iterator mi;
     for (mi=m.begin() ; mi!=m.end() ; mi++)
 	l.push_back (mi);
 
@@ -534,7 +550,7 @@ template <typename T> void dump_desc_len (const string & tname, map <T, Qualifie
 //    int nw = (int)(log2(l.size()) / log2(10)) + 1;
     size_t n = 0;
     size_t curtot = 0;
-    typename list <typename map <T, Qualifier>::const_iterator>::const_iterator li;
+    typename list <typename MappedQualifier<T>::const_iterator>::const_iterator li;
 
     NSTabulatedOut::TabulatedOut tabul (cout);
 
@@ -553,22 +569,27 @@ template <typename T> void dump_desc_len (const string & tname, map <T, Qualifie
 	}
 
 //	cout << setw(maxw) << (*li)->second.len << " "
-//	     << setw(3)    << (100*(*li)->second.len)/total.len << "% "
-//	     << setw(3)    << (100*curtot)/total.len << "%"
+//	     << setw(3)    << (100*(*li)->second.len)/m.localtotal.len << "% "
+//	     << setw(3)    << (100*curtot)/m.localtotal.len << "%"
 //	     << endl;
 	buf << (*li)->second.len << "\t+"
+	     << (100*(*li)->second.len)/m.localtotal.len << "%\t+"
+	     << (100*curtot)/m.localtotal.len << "%\t+"
+	     << " ("
 	     << (100*(*li)->second.len)/total.len << "%\t+"
-	     << (100*curtot)/total.len << "%\t+";
+	     << (100*curtot)/total.len << "%\t+"
+	     << " grand-total)";
 	tabul.push_back (buf.str());
-	if ((double)curtot/(double)total.len > ceil) break;
+	if ((double)curtot/(double)m.localtotal.len > ceil) break;
     }
     tabul.flush();
 }
 
 // --------- insert_qualifier templates --------------------------------------------------------------------------------------------------------
 
-template <typename T> void insert_qualifier (map <T, Qualifier> &m, T const &key, Qualifier q) {
-    typename map <T, Qualifier>::iterator mi = m.find (key);
+template <typename T> void insert_qualifier (MappedQualifier <T> &m, T const &key, Qualifier q) {
+    typename MappedQualifier<T>::iterator mi = m.find (key);
+    m.localtotal += q;
     if (mi != m.end())
 	mi->second += q;
     else
@@ -948,23 +969,23 @@ int getAS (const Level3Addr &a) {
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 
 
-map <MacAddr, Qualifier> rep_src_macaddr;
-map <MacAddr, Qualifier> rep_dst_macaddr;
-map <MacPair, Qualifier> rep_pair_macaddr;
+MappedQualifier <MacAddr> rep_src_macaddr;
+MappedQualifier <MacAddr> rep_dst_macaddr;
+MappedQualifier <MacPair> rep_pair_macaddr;
 
-map <Level3Addr, Qualifier> rep_l3src;
-map <Level3Addr, Qualifier> rep_l3dst;
-map <Level3AddrPair, Qualifier> rep_l3pair;
+MappedQualifier <Level3Addr> rep_l3src;
+MappedQualifier <Level3Addr> rep_l3dst;
+MappedQualifier <Level3AddrPair> rep_l3pair;
 
-map <Level3Addr, Qualifier> rep_ip6src;
-map <Level3Addr, Qualifier> rep_ip6dst;
-map <Level3AddrPair, Qualifier> rep_ip6pair;
+MappedQualifier <Level3Addr> rep_ip6src;
+MappedQualifier <Level3Addr> rep_ip6dst;
+MappedQualifier <Level3AddrPair> rep_ip6pair;
 
-map <AS, Qualifier> rep_ASsrc;
-map <AS, Qualifier> rep_ASdst;
-map <ASPair, Qualifier> rep_ASpair;
+MappedQualifier <AS> rep_ASsrc;
+MappedQualifier <AS> rep_ASdst;
+MappedQualifier <ASPair> rep_ASpair;
 
-map <Ethertype, Qualifier> rep_ethertype;
+MappedQualifier <Ethertype> rep_ethertype;
 
 size_t totsize = 0;
 size_t nbpacket = 0;

@@ -3,7 +3,7 @@ all: capstat
 
 
 vimtest: capstat
-	tcpdump -vvv -e -n -r ../Captures/capture* | head -1000 | ./capstat --sizes --fullview=full.bgp.txt
+	tcpdump -vvv -e -n -r ~/Captures/capture* | head -10000 | ./capstat --sizes --fullview=full.bgp.txt
 	####	tcpdump -vvv -e -n -r capture* | head -10000 | ./capstat
 	# tcpdump -vvv -e -n -r capture* | head -100000 | ./capstat
 
