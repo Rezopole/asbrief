@@ -30,7 +30,7 @@ command flags
 Unit Testings
             provide a neutral and rather exhaustive capture for unit-testings
 
-Output
+Outputs
 	    json-encoded output
 	    html output
 	    svg or better ?
