@@ -22,6 +22,10 @@
 
 
 
+
+#ifndef NSTABULATEDOUT
+#define NSTABULATEDOUT
+
 #include <iostream>
 #include <iomanip>
 #include <string>
@@ -105,4 +109,7 @@ namespace NSTabulatedOut {
 	    }
 	}
     };
-}
+
+} // namespace NSTabulatedOut
+
+#endif // NSTABULATEDOUT

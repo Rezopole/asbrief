@@ -21,8 +21,19 @@
 // }
 
 
+
+
+#ifndef RZPNETMACADDR
+#define RZPNETMACADDR
+
 #include <iostream>
 #include <iomanip>
+
+namespace rzpnet {
+
+    using namespace std;
+
+#include <net/ethernet.h>
 
 // #include <string>
 
@@ -46,6 +57,16 @@ class MacAddr  {
     MacAddr (void) : addr(0xffffffffffffffff) {}
     MacAddr (MacAddr const & o) : addr(o.addr) {}
     MacAddr (uint64_t addr) : addr(addr) {
+    }
+    inline MacAddr (const ether_addr * pether) : addr (0) {
+	const u_char *s = (const u_char *) pether;
+	size_t shift = 8*5;
+	addr += ((uint64_t)(*s++)) << shift; shift-=8;
+	addr += ((uint64_t)(*s++)) << shift; shift-=8;
+	addr += ((uint64_t)(*s++)) << shift; shift-=8;
+	addr += ((uint64_t)(*s++)) << shift; shift-=8;
+	addr += ((uint64_t)(*s++)) << shift; shift-=8;
+	addr += ((uint64_t)(*s++)) << shift;
     }
     MacAddr (const string &s) : addr (0xffffffffffffffff) {
 	if (s.size() < 12) {
@@ -155,4 +176,8 @@ ostream &operator<< (ostream &out, const MacAddr &m) {
     }
     return out;
 }
+
+} // namespace rzp_net
+
+#endif  // RZPNETMACADDR
 

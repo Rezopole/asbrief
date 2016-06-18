@@ -21,6 +21,11 @@
 // }
 
 
+
+
+#ifndef STDJDREADLINE
+#define STDJDREADLINE
+
 #include <iostream>
 
 namespace stdjd {
@@ -35,6 +40,7 @@ namespace stdjd {
 	    size_t n=0;
 	    while (cin && cin.get(c) && (c!=10) && (c!=13)) {
 		if (c==9) {
+		    // this part untabulates things ...
 		    int nn = 8 - (n%8);
 		    for (int i=0 ; i<nn ; i++) s+=' ', n++;
 		} else {
@@ -57,3 +63,6 @@ namespace stdjd {
 	}
     }
 }
+
+#endif // STDJDREADLINE
+

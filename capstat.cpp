@@ -22,6 +22,7 @@
 
 
 
+
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -37,6 +38,8 @@
 #include <string.h> // strerror
 
 #include "macaddr.h"
+#include "ethertype.h"
+#include "level3addr.h"
 
 #include "readline.h"
 
@@ -45,6 +48,7 @@
 
 using namespace std;
 using namespace stdjd;
+using namespace rzpnet;
 
 size_t seek_ending_parenthesis (const string &s, size_t p) {
     size_t q = s.find ('(', p);
@@ -123,219 +127,7 @@ ostream &operator<< (ostream &out, const AS &a) {
 	return out << "(as" << a.as << ")";
 }
 
-// --------- Ethertype -------------------------------------------------------------------------------------------------------------------------
-
-typedef enum {
-    TETHER_IPV4,
-    TETHER_IPV6,
-    TETHER_ARP,
-    TETHER_8023,
-    TETHER_8021Q,
-    TETHER_MOPRC,
-    TETHER_LLC,
-    TETHER_AOE,
-    TETHER_UNKNOWN,
-    TETHER_OTHER
-} TEthertype;
-
-class Ethertype {
-  public:
-    TEthertype ethertype;
-    Ethertype () : ethertype (TETHER_UNKNOWN) {};
-    Ethertype (const string &s) {
-//cerr << "===================" << s.substr (0,20) << endl;
-	     if (s.find ("ethertype IPv4") == 0)		ethertype = TETHER_IPV4;
-	else if (s.find ("ethertype IPv6") == 0)		ethertype = TETHER_IPV6;
-	else if (s.find ("ethertype ARP") == 0)			ethertype = TETHER_ARP;
-	else if (s.find ("802.3") == 0)				ethertype = TETHER_8023;
-	else if (s.find ("ethertype 802.1Q") == 0)		ethertype = TETHER_8021Q;
-	else if (s.find ("LLC") == 0)				ethertype = TETHER_LLC;
-	else if (s.find ("ethertype MOP RC") == 0)		ethertype = TETHER_MOPRC;
-	else if (s.find ("ethertype AoE") == 0)			ethertype = TETHER_AOE;
-	else if (s.find ("ethertype Unknown ") == 0)		ethertype = TETHER_UNKNOWN;
-	else							ethertype = TETHER_OTHER;
-    }
-    Ethertype (const Ethertype &o) : ethertype(o.ethertype) {}
-    bool operator< (const Ethertype &a) const {
-	return ethertype < a.ethertype;
-    }
-};
-ostream &operator<< (ostream &out, const Ethertype &p) {
-    switch (p.ethertype) {
-	case TETHER_IPV4:    return out << "IPv4";
-	case TETHER_IPV6:    return out << "IPv6";
-	case TETHER_ARP:     return out << "ARP";
-	case TETHER_8023:    return out << "803.3";
-	case TETHER_MOPRC:   return out << "MOP RC";
-	case TETHER_AOE:     return out << "AoE";
-	case TETHER_8021Q:   return out << "802.1q";
-	case TETHER_UNKNOWN: return out << "Unknown";
-	case TETHER_OTHER:   return out << "Other";
-	default:             return out << "Other";
-    }
-}
-
 // --------- Level3Addr ------------------------------------------------------------------------------------------------------------------------
-
-class Level3Addr;
-ostream &operator<< (ostream &out, const Level3Addr &a);
-Level3Addr l3mask (int nb);
-
-class Level3Addr {
-  private:
-    static Level3Addr mask[128];
-    static bool mask_not_initialized;
-
-  public:
-    TEthertype t;
-    unsigned char b[16];
-
-    bool valid (void) const {
-	return ((t == TETHER_IPV4) || (t == TETHER_IPV6));
-    }
-
-    Level3Addr (void)  : t(TETHER_UNKNOWN) {
-	size_t i;
-	for (i=0 ; i<16 ; i++) b[i] = 0;
-    }
-
-    void applymask (Level3Addr const &mask) {
-	size_t i;
-	for (i=0 ; i<16 ; i++) b[i] &= mask.b[i];
-    }
-
-    inline void init_mask (void) {
-	if (mask_not_initialized) {
-	    size_t i;
-	    for (i=0 ; i<128 ; i++) {
-		mask[i] = l3mask(i);
-	    }
-	    mask_not_initialized = false;
-	}
-    }
-
-    void applymask (int masklen) {
-	init_mask();
-	if (masklen < 0) masklen = 0;
-	if (masklen >=128) return;
-	applymask (mask[masklen]);
-    }
-
-    Level3Addr (TEthertype proposed_type, string const &s) : t(TETHER_UNKNOWN) {
-	size_t p, i;
-	switch (proposed_type) {
-	  case TETHER_IPV4:
-	    b[0] = atoi (s.c_str());
-	    p = s.find('.');
-	    if (p!=string::npos) {
-		b[1] = atoi (s.substr(p+1).c_str());
-		p = s.find('.', p+1);
-		if (p!=string::npos) {
-		    b[2] = atoi (s.substr(p+1).c_str());
-		    p = s.find('.', p+1);
-		    if (p!=string::npos) {
-			b[3] = atoi (s.substr(p+1).c_str());
-			t = TETHER_IPV4;
-		    }
-		}
-	    }
-	    for (i=4 ; i<16 ; i++) b[i] = 0;	// we pad with zeros for comparisons
-	    break;
-
-	  case TETHER_IPV6:
-	    p = s.find_first_not_of ("0123456789abcdefABCDEF:");
-	    if (p == string::npos) {
-		if (inet_pton(AF_INET6, s.c_str(), &(b[0])) == 1)
-		    t = TETHER_IPV6;
-	    } else {
-		if (inet_pton(AF_INET6, s.substr(0,p).c_str(), &(b[0])) == 1)
-		    t = TETHER_IPV6;
-	    }
-	    break;
-
-	  default:
-	    for (i=0 ; i<16 ; i++) b[i] = 0;
-	    t = TETHER_UNKNOWN;
-	}
-    }
-
-    Level3Addr (Level3Addr const &r) : t(r.t) {
-	size_t i;
-	for (i=0 ; i<16 ; i++) b[i] = r.b[i];
-    }
-    bool operator< (const Level3Addr &a) const {
-	if (t < a.t) {
-	    return true;
-	} else if (a.t < t) {
-	    return false;
-	} else {	// we have equal types
-	    size_t i;
-	    for (i=0 ; i<16 ; i++) {
-		if (b[i] < a.b[i]) {
-		    return true;
-		} else if (a.b[i] < b[i]) {
-		    return false;
-		}
-	    }
-	}
-	return false;	// we should get there only if a == *this
-    }
-
-    bool operator== (const Level3Addr &a) const {
-	if (t != a.t) {
-	    return false;
-	}
-	// we have equal types
-	size_t i;
-	for (i=0 ; i<16 ; i++) {
-	    if (b[i] != a.b[i]) {
-		return false;
-	    }
-	}
-	return true;	// we should get there only if a == *this
-    }
-
-};
-
-bool Level3Addr::mask_not_initialized = true;
-Level3Addr Level3Addr::mask[128];
-
-ostream &operator<< (ostream &out, const Level3Addr &a) {
-    stringstream s;
-    switch (a.t) {
-      case TETHER_IPV4:
-	s << (unsigned int)a.b[0] << '.' << (unsigned int)a.b[1] << '.' << (unsigned int)a.b[2] << '.' << (unsigned int)a.b[3];
-	return out << s.str();
-	break;
-      case TETHER_IPV6:
-	char str[INET6_ADDRSTRLEN];
-	inet_ntop(AF_INET6, &(a.b[0]), str, INET6_ADDRSTRLEN);
-	return out << str;
-	break;
-      default:
-	return out << "invalidL3addr";
-	break;
-    }
-}
-
-Level3Addr l3mask (int nb) {
-    Level3Addr mask;
-    mask.t = TETHER_IPV6;
-
-    int bit = 0;
-
-    for (bit=0 ; bit<128 ; bit++) {
-	size_t i = bit / 8;
-	size_t n = 7-(bit % 8);
-
-	if (bit < nb) {	// we set one bit to 1
-	    mask.b[i] |= (1 << n);
-	} else {	// we set one bit to 0
-	    mask.b[i] &= ~(1 << n);
-	}
-    }
-    return mask;
-}
 
 void matcher (const Level3Addr &a, ostream &out);  // thyis one is defined later because of Level3Addr / Prefix interdependencies
 
