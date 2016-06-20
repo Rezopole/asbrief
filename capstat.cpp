@@ -865,6 +865,32 @@ int getAS (const Level3Addr &a) {
     }
 }
 
+// --------- VLan ------------------------------------------------------------------------------------------------------------------------------
+
+class VLan {
+  public:
+    int id;
+
+    VLan (void) : id(-2) {}
+    VLan (int id) : id(id) {}
+    VLan (const VLan &vl) : id(vl.id) {}
+
+    bool operator< (const VLan &vl) const {
+	return id < vl.id;
+    }
+};
+
+ostream &operator<< (ostream &out, const VLan vl) {
+    if (vl.id > 0)
+	return out << "vlan." << vl.id;
+    else if (vl.id == -2)
+	return out << "vlan.undefined";
+    else if (vl.id == -1)
+	return out << "untagged";
+    else
+	return out << "vlan.weird." << vl.id;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -885,6 +911,7 @@ MappedQualifier <AS> rep_ASdst;
 MappedQualifier <ASPair> rep_ASpair;
 
 MappedQualifier <Ethertype> rep_ethertype;
+MappedQualifier <VLan> rep_vlan;
 
 size_t totsize = 0;
 size_t nbpacket = 0;
@@ -983,6 +1010,7 @@ void process_packet (u_char *args, const struct pcap_pkthdr *header, const u_cha
     Ethertype etype ((const u_short *) (packet+12));
 
     pq.ethertype = etype;
+    pq.vlan = -1;
 
     if (debug) cout << src << " -> " << dst << " " << etype << " len=" << header->len;
 
@@ -1017,11 +1045,12 @@ void process_packet (u_char *args, const struct pcap_pkthdr *header, const u_cha
 	Qualifier q (pq.packetlen);
 
 	insert_qualifier (rep_src_macaddr, pq.src, q);
+	insert_qualifier (rep_ethertype, pq.ethertype, q);
+	insert_qualifier (rep_vlan, VLan(pq.vlan), q);
 	if (pq.dst.valid()) {
 	    insert_qualifier (rep_dst_macaddr, pq.dst, q);
 	    MacPair pair(pq.src, pq.dst);
 	    insert_qualifier (rep_pair_macaddr, pair, q);
-	    insert_qualifier (rep_ethertype, pq.ethertype, q);
 	}
 	if (pq.l3src.valid()) {
 	    AS ASsrc = getAS(pq.l3src);
@@ -1051,6 +1080,9 @@ void process_packet (u_char *args, const struct pcap_pkthdr *header, const u_cha
 void report (ostream &cout) {
     {    dump_desc_nb  ("EtherType", rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
     {    dump_desc_len ("EtherType", rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
+
+    {    dump_desc_nb  ("VLan", rep_vlan, cout, Qualifier(nbpacket,totsize)); cout << endl; }
+    {    dump_desc_len ("VLan", rep_vlan, cout, Qualifier(nbpacket,totsize)); cout << endl; }
 
     if (displayframes) {    dump_desc_nb  ("src mac-address", rep_src_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
     if (displaysizes)  {    dump_desc_len ("src mac-address", rep_src_macaddr, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
