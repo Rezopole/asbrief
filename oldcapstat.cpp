@@ -37,24 +37,18 @@
 #include <errno.h>  // errno
 #include <string.h> // strerror
 
-#include <stdio.h>
-#include <pcap.h>
-
 #include "macaddr.h"
 #include "ethertype.h"
 #include "level3addr.h"
 
 #include "readline.h"
+
 #include "fmtstream.h"
 
-
-
-// #include <netinet/if_ether.h> 
 
 using namespace std;
 using namespace stdjd;
 using namespace rzpnet;
-
 
 size_t seek_ending_parenthesis (const string &s, size_t p) {
     size_t q = s.find ('(', p);
@@ -897,158 +891,153 @@ bool displayframes = true;
 double percent_ceil = 0.9;
 bool matched = true;
 
+typedef enum {
+    SEEK_NEXT_PACKET,
+    SEEK_FIRST_IPV4,
+} Treadtextstate;
 
-// --------- proper pcap part ------------------------------------------------------------------------------------------------------------------
+int capstat (istream &cin, ostream &cout) {
 
-class PacketQual {
-  public:
-    int ipv4_mask;
-    int ipv6_mask;
-    MacAddr src, dst;
-    Level3Addr l3src, l3dst;
-    Ethertype ethertype;
-    long packetlen;
-    int vlan;
+    Level3Addr ipv4mask = l3mask (ipv4_mask);
+    Level3Addr ipv6mask = l3mask (ipv6_mask);
+cout << "ipv4mask = " << ipv4mask << endl;
+cout << "ipv6mask = " << ipv6mask << endl << endl ;
+    size_t lno = 0;
+    Treadtextstate state = SEEK_NEXT_PACKET;
+    while (cin) {
+	MacAddr src, dst;
+	Level3Addr l3src, l3dst;
+	Ethertype ethertype;
+	long packetlen = 0;
 
-    PacketQual (void) : packetlen (0), vlan (-1) {}
-    void invalidate (void) {
-	src.addr = 0xffffffffffffffff;
-	dst.addr = 0xffffffffffffffff;
-	ethertype.ethertype = TETHER_UNKNOWN;
-	l3src.t = TETHER_UNKNOWN;
-	l3dst.t = TETHER_UNKNOWN;
-    }
-};
+	do {
+	    string s;
+	    lno++; readline (cin, s);
+	    size_t p, q;
+	    int vlan = -1;
 
-bool debug = false;
+	    switch (state) {
+	      case SEEK_NEXT_PACKET:
+		if (isdigit(s[0])) {    // the line must start with a time-stamp
+		    p = s.find(' ');
+		    if (p != string::npos) {
+			src = MacAddr (s.substr(p+1));
+			if (src.invalid()) cerr << "   ligne : " << lno << endl;
+			p = s.find (" > ", p+1);
+			if (p != string::npos) {
+			    dst = MacAddr (s.substr(p+3));
+			    if (dst.invalid()) cerr << "   ligne : " << lno << endl;
+			    p = s.find (", ", p+3);
+			    if (p != string::npos) {
+				ethertype = Ethertype (s.substr (p+2));
+				p = s.find (", length ", p+2);
+				if (p != string::npos) {
+				    packetlen = atol (s.substr(p+9, 10).c_str());
 
-void process_ipv4 (u_char *args, const u_char *packet, size_t len) {
-    PacketQual &pq = *(PacketQual *) args;
-    Level3Addr l3src (TETHER_IPV4, packet+12);
-    Level3Addr l3dst (TETHER_IPV4, packet+16);
-    if (debug)
-	cout << "      " << l3src << " -> " << l3dst << endl;
-    pq.l3src = l3src;
-    pq.l3src.applymask (pq.ipv4_mask);
-    pq.l3dst = l3dst;
-    pq.l3dst.applymask (pq.ipv4_mask);
-}
+								if (ethertype.ethertype == TETHER_IPV6) {
+								    p = seek_ending_parenthesis (s, p+9);
+								    l3src = Level3Addr(TETHER_IPV6, s.substr (p+1));
+								    l3src.applymask (ipv6mask);
+								    p = s.find (" > ", p);
+								    if (p != string::npos) {
+									l3dst = Level3Addr(TETHER_IPV6, s.substr (p+3));
+									l3dst.applymask (ipv6mask);
+								    }
 
-void process_ipv6 (u_char *args, const u_char *packet, size_t len) {
-    PacketQual &pq = *(PacketQual *) args;
-    Level3Addr l3src (TETHER_IPV6, packet+8);
-    Level3Addr l3dst (TETHER_IPV6, packet+24);
-    if (debug)
-	cout << "      " << l3src << " -> " << l3dst << endl;
-    pq.l3src = l3src;
-    pq.l3src.applymask (pq.ipv6_mask);
-    pq.l3dst = l3dst;
-    pq.l3dst.applymask (pq.ipv6_mask);
-}
+				    } else if (ethertype.ethertype == TETHER_8021Q) {
+					q = s.find (": vlan ", p+9);
+					if (q != string::npos) {
+					    p = q;
+					    vlan = atoi (s.substr(p+7).c_str());
+					    p = s.find (", ", p+7);
+					    if (p != string::npos) {
+						p = s.find (", ", p+2);
+						ethertype = Ethertype (s.substr (p+2));
 
-void process_packet (u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-    PacketQual &pq = *(PacketQual *) args;
-    size_t l;
+								if (ethertype.ethertype == TETHER_IPV6) {
+								    p = seek_ending_parenthesis (s, p+9);
+//cerr << "   lala   ==" << s.substr (p+1) << endl;
+								    l3src = Level3Addr(TETHER_IPV6, s.substr (p+1));
+								    l3src.applymask (ipv6mask);
+								    p = s.find (" > ", p);
+								    if (p != string::npos) {
+									l3dst = Level3Addr(TETHER_IPV6, s.substr (p+3));
+									l3dst.applymask (ipv6mask);
+								    }
+								}
 
-    pq.invalidate();
-    pq.packetlen = header->len;
+					    }
+					} else {
+					    vlan = 0;
+					}
+				    }
+				}
+			    }
+			}
+		    }
+		}
+		if (ethertype.ethertype == TETHER_IPV4)
+		    state = SEEK_FIRST_IPV4;
+		break;
 
-    if (header->len < 16) {
-	cerr << "what a small ethernet header ! : len=" << header->len << endl;
+	      case SEEK_FIRST_IPV4:
+		if (isdigit(s[0])) {
+		    state = SEEK_NEXT_PACKET;
+		    break;
+		}
+		p = s.find_first_not_of (' ');
+		if (p != string::npos) {
+		    l3src = Level3Addr(TETHER_IPV4, s.substr (p));
+//		    l3src.applymask (ipv4mask);
+l3src.applymask (ipv4_mask);
+		    p = s.find (" > ", p);
+		    if (p != string::npos) {
+			l3dst = Level3Addr(TETHER_IPV4, s.substr (p+3));
+//			l3dst.applymask (ipv4mask);
+l3dst.applymask (ipv4_mask);
+		    }
+		}
 
-	for (l=0 ; (l<header->len) && (l<16) ; l++) {
-	    if (isalnum (packet[l]))
-		cerr << packet[l];
-	    else
-		cerr << '.';
-	    if (l==7) cerr << ' ';
-	}
-	cerr << " | " ;
-	for (l=0 ; (l<header->len) && (l<16) ; l++) {
-	    cerr << setw(2) << setfill ('0') << setbase(16) << (int)packet[l] << " ";
-	    if (l==7) cerr << ' ';
-	}
-	cerr << endl;
-	cerr << endl;
+		state = SEEK_NEXT_PACKET;
+		break;
+	    }
+	} while (cin && (state != SEEK_NEXT_PACKET));
 
-// JDJDJD the pq object should be invalidated here ?
-	return;
-    }
-    MacAddr dst ((const ether_addr *) packet);
-    MacAddr src ((const ether_addr *) (packet+6));
-    
-    pq.src = src;
-    pq.dst = dst;
+	if (src.valid()) {
+	    nbpacket ++;
+	    totsize += packetlen;
+	    Qualifier q (packetlen);
 
-    Ethertype etype ((const u_short *) (packet+12));
-
-    pq.ethertype = etype;
-
-    if (debug) cout << src << " -> " << dst << " " << etype << " len=" << header->len;
-
-    if (etype.ethertype == TETHER_IPV4) {
-	if (debug) cout << endl;
-	process_ipv4 (args, packet+14, header->len -14);
-    } else if (etype.ethertype == TETHER_IPV6) {
-	if (debug) cout << endl;
-	process_ipv6 (args, packet+14, header->len -14);
-    } else if (etype.ethertype == TETHER_8021Q) {
-	const u_char * p = packet+14;
-	u_short vlanid = ((*p & 0xf) << 8) + *(p+1);  // 12 lower bits
-
-	pq.vlan = vlanid;
-	if (debug) cout << ", vlanid=" << vlanid << endl;
-
-	Ethertype etype ((const u_short *) (packet+16));
-	pq.ethertype = etype;
-	if (debug) cout << "   " << etype << endl;
-
-	if (etype.ethertype == TETHER_IPV4) {
-	    process_ipv4 (args, packet+18, header->len -18);
-	} else if (etype.ethertype == TETHER_IPV6) {
-	    process_ipv6 (args, packet+18, header->len -18);
-	}
-    }
-
-    
-    if (pq.src.valid()) {
-	nbpacket ++;
-	totsize += pq.packetlen;
-	Qualifier q (pq.packetlen);
-
-	insert_qualifier (rep_src_macaddr, pq.src, q);
-	if (pq.dst.valid()) {
-	    insert_qualifier (rep_dst_macaddr, pq.dst, q);
-	    MacPair pair(pq.src, pq.dst);
-	    insert_qualifier (rep_pair_macaddr, pair, q);
-	    insert_qualifier (rep_ethertype, pq.ethertype, q);
-	}
-	if (pq.l3src.valid()) {
-	    AS ASsrc = getAS(pq.l3src);
-	    insert_qualifier (rep_l3src, pq.l3src, q);
-	    insert_qualifier (rep_ASsrc, ASsrc, q);
-	    if (pq.l3src.t == TETHER_IPV6)
-		insert_qualifier (rep_ip6src, pq.l3src, q);
-	    if (pq.l3dst.valid()) {
-		AS ASdst = getAS(pq.l3dst);
-		insert_qualifier (rep_l3dst, pq.l3dst, q);
-		insert_qualifier (rep_ASdst, ASdst, q);
-		Level3AddrPair pair(pq.l3src, pq.l3dst);
-		insert_qualifier (rep_l3pair, pair, q);
-		ASPair aspair (ASsrc, ASdst);
-		insert_qualifier (rep_ASpair, aspair, q);
-		if (pq.l3dst.t == TETHER_IPV6) {
-		    insert_qualifier (rep_ip6dst, pq.l3dst, q);
-		    insert_qualifier (rep_ip6pair, pair, q);
+	    insert_qualifier (rep_src_macaddr, src, q);
+	    if (dst.valid()) {
+		insert_qualifier (rep_dst_macaddr, dst, q);
+		MacPair pair(src, dst);
+		insert_qualifier (rep_pair_macaddr, pair, q);
+		insert_qualifier (rep_ethertype, ethertype, q);
+	    }
+	    if (l3src.valid()) {
+		AS ASsrc = getAS(l3src);
+		insert_qualifier (rep_l3src, l3src, q);
+		insert_qualifier (rep_ASsrc, ASsrc, q);
+		if (l3src.t == TETHER_IPV6)
+		    insert_qualifier (rep_ip6src, l3src, q);
+		if (l3dst.valid()) {
+		    AS ASdst = getAS(l3dst);
+		    insert_qualifier (rep_l3dst, l3dst, q);
+		    insert_qualifier (rep_ASdst, ASdst, q);
+		    Level3AddrPair pair(l3src, l3dst);
+		    insert_qualifier (rep_l3pair, pair, q);
+		    ASPair aspair (ASsrc, ASdst);
+		    insert_qualifier (rep_ASpair, aspair, q);
+		    if (l3dst.t == TETHER_IPV6) {
+			insert_qualifier (rep_ip6dst, l3dst, q);
+			insert_qualifier (rep_ip6pair, pair, q);
+		    }
 		}
 	    }
 	}
     }
 
-}
-
-
-void report (ostream &cout) {
     {    dump_desc_nb  ("EtherType", rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
     {    dump_desc_len ("EtherType", rep_ethertype, cout, Qualifier(nbpacket,totsize)); cout << endl; }
 
@@ -1093,12 +1082,19 @@ void report (ostream &cout) {
 
     if (displayframes) {    dump_desc_nb  ("src/dst AS", rep_ASpair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
     if (displaysizes)  {    dump_desc_len ("src/dst AS", rep_ASpair, cout, Qualifier(nbpacket,totsize), matched, percent_ceil); cout << endl; }
+
+
+//    cout << "nb packet = " << nbpacket << endl;
+//    cout << "nb src mac = " << rep_src_macaddr.size() << endl;
+//    cout << "nb dst mac = " << rep_dst_macaddr.size() << endl;
+//    cout << "nb pair mac = " << rep_pair_macaddr.size() << endl;
+    cout << "tcpdump line read : " << lno << endl;
+    return 0;
 }
 
 
 void usage (ostream &cout, char *cmde0) {
-    cout << "usage :  " << cmde0 << " [-h|--help] [[--capture=]filename] [--count=nbpackets]"
-	 << "                  [--ceil=xx%] [--sizes] [--frames] [--sizes+frames (default)]" << endl
+    cout << "usage :  " << cmde0 << " [-h|--help] [--ceil=xx%] [--sizes] [--frames] [--sizes+frames (default)]" << endl
          << "                  [--mask=(0-32)] [--nomask]" << endl
          << "                  [--ipv4mask=(0-32)] [--ipv6mask=(0-128)]" << endl
          << "                  [--fullview=fname ]" << endl
@@ -1110,21 +1106,12 @@ int main (int nb, char ** cmde) {
     int i;
 
     string fullviewfname;  //  ("full.bgp.txt");
-    list<string> capturefiles;
-    string dev;
-    long count = 0;
 
     for (i=1 ; i<nb ; i++) {
 	if (cmde[i][0] == '-') {
 	    if ((strcmp (cmde[i], "--help") == 0) || (strcmp (cmde[i], "-h") ==0)) {
 		usage (cout, cmde[0]);
 		return 0;
-	    }
-	    if (strncmp (cmde[i], "--capture=", 10) == 0) {
-		capturefiles.push_back (cmde[i]+10);
-	    }
-	    if (strncmp (cmde[i], "--count=", 8) == 0) {
-		count = atol (cmde[i]+8);
 	    }
 	    if (strncmp (cmde[i], "--fullview=", 11) == 0) {
 		fullviewfname = cmde[i]+11;
@@ -1171,8 +1158,6 @@ int main (int nb, char ** cmde) {
 		ipv4_mask = 32;
 		ipv6_mask = 128;
 	    }
-	} else {    // attempt to read as a capture file
-	    capturefiles.push_back (cmde[i]);
 	}
     }
 
@@ -1226,95 +1211,24 @@ if (false)	// set of basic tests for Prefix maps
 							return 0;
 }
 
-    bool full_view_and_co_not_read_yet = true;
-
-    char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *handle = NULL;
-    PacketQual pq;
-
-    pq.ipv4_mask = ipv4_mask;
-    pq.ipv6_mask = ipv6_mask;
-
-    list<string>::iterator li;
-
-    for (li=capturefiles.begin() ; li!=capturefiles.end() ; li++) {
-	string &capturefile = *li;
-
-	//handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
-	handle = pcap_open_offline (capturefile.c_str(), errbuf);
-	if (handle == NULL) {
-	    cerr << "Couldn't open capture file \"" << capturefile << "\" : " << errbuf << endl;
-	    return(2);
+    if (!fullviewfname.empty()) {
+	ifstream fullview (fullviewfname.c_str());
+	if (!fullview) {
+	    int e = errno;
+	    cerr << "could not read full-view file : " << fullviewfname << " : " << strerror (e) << endl;
 	}
-	dev = capturefile;
-
-	if (full_view_and_co_not_read_yet) {
-	    if (!fullviewfname.empty()) {
-		ifstream fullview (fullviewfname.c_str());
-		if (!fullview) {
-		    int e = errno;
-		    cerr << "could not read full-view file : " << fullviewfname << " : " << strerror (e) << endl;
-		}
-		else {
-		    hash_full_bgp (fullview);
-		    view_ipv4.reparent();
-		    view_ipv6.reparent();
-		}
-	    }
-
-	    {	ifstream asnlist("asn.list");
-		hash_asnlist (asnlist);
-	    }
-
-	    {   Level3Addr m4(TETHER_IPV4, "255.255.255.255");
-		Level3Addr m6(TETHER_IPV6, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff");
-		m4.applymask (ipv4_mask);
-		m6.applymask (ipv6_mask);
-
-	    cout << "ipv4mask = " << m4 << endl;
-	    cout << "ipv6mask = " << m6 << endl << endl ;
-	    }
-
-	    full_view_and_co_not_read_yet = false;
+	else {
+	    hash_full_bgp (fullview);
+	    view_ipv4.reparent();
+	    view_ipv6.reparent();
 	}
-	
-	if (pcap_datalink(handle) != DLT_EN10MB) {
-	    cerr << "Device " << dev << " doesn't provide Ethernet headers - not supported" << endl;
-	    return(2);
-	}
-
-	bpf_u_int32 net, mask;
-	if (pcap_lookupnet(dev.c_str(), &net, &mask, errbuf) == -1) {
-	    cerr << "Can't get netmask for device " << dev << endl;
-	    net = 0;
-	    mask = 0;
-	}
-
-	struct bpf_program fp;	/* The compiled filter expression */
-	char filter_exp[] = "";
-	// char filter_exp[] = "port 23 and host 134.214.100.6"; /* The filter expression */
-
-	if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
-	    cerr << "Couldn't parse filter " << filter_exp << " : " << pcap_geterr(handle) << endl;
-	    return(2);
-	}
-	if (pcap_setfilter(handle, &fp) == -1) {
-	    cerr << "Couldn't parse filter " << filter_exp << " : " << pcap_geterr(handle) << endl;
-	    return(2);
-	}
-
-
-
-
-	int r = pcap_loop(handle, count, process_packet, (u_char *)&pq);
-
-	cout << endl << "pcap_loop returned : " << r << endl;
-
-	pcap_close (handle);
     }
 
+    {	ifstream asnlist("asn.list");
+	hash_asnlist (asnlist);
+    }
 
-    report (cout);
+    return capstat (cin, cout);
 
     return 0;
 
