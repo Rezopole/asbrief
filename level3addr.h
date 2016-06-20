@@ -88,6 +88,7 @@ class Level3Addr {
 	switch (proposed_type) {
 	  case TETHER_IPV4:
 	    for (i=0 ; i<4 ; i++) b[i] = *p++;
+	    for ( ; i<16 ; i++) b[i] = 0;
 	    t = TETHER_IPV4;
 	    break;
 	  case TETHER_IPV6:
