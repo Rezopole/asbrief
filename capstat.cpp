@@ -606,6 +606,64 @@ cerr << "getAS : " << a << " not into " << mi->first << endl;
 	return -3;
 }
     }
+
+
+    ostream & dump_a_la_ios (ostream & cout, bool modeipv6 = false) {
+	map <Prefix, int>::const_iterator mi;
+
+	if (modeipv6) {
+	    cout
+		<< "For address family: IPv6 Unicast" << endl
+		<< "" << endl
+		<< "BGP table version is 33694854, local router ID is 193.252.227.2" << endl
+		<< "Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, " << endl
+		<< "              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, " << endl
+		<< "              x best-external, a additional-path, c RIB-compressed, " << endl
+		<< "Origin codes: i - IGP, e - EGP, ? - incomplete" << endl
+		<< "RPKI validation codes: V valid, I invalid, N Not found" << endl
+		<< "" << endl
+		<< "     Network          Next Hop            Metric LocPrf Weight Path" << endl;
+
+	} else {
+	    cout
+		<< "BGP table version is 291945515, local router ID is 193.252.227.2" << endl
+		<< "Status codes: s suppressed, d damped, h history, * valid, > best, i - internal, " << endl
+		<< "              r RIB-failure, S Stale, m multipath, b backup-path, f RT-Filter, " << endl
+		<< "              x best-external, a additional-path, c RIB-compressed, " << endl
+		<< "Origin codes: i - IGP, e - EGP, ? - incomplete" << endl
+		<< "RPKI validation codes: V valid, I invalid, N Not found" << endl
+		<< "" << endl
+		<< "     Network          Next Hop            Metric LocPrf Weight Path" << endl;
+	}
+
+	for (mi=m.begin() ; mi!=m.end() ; mi++) {
+	    stringstream s;
+//	    if (modeipv6)
+//		s << " *   " << mi->first;
+//	    else
+		s << " *>  " << mi->first;
+
+	    if (s.str().size() >= 22) {// we break the line in order to be in the proper column on next line
+		stringstream s;
+		s << " *   " << mi->first;
+		cout << s.str() << endl
+		     << " *>                    ";
+	    } else {
+		cout << std::left << setw(22) << s.str();
+	    }
+
+	    if (modeipv6) {
+		cout << "2A02:1111:1111:1111:1" << endl;
+		cout << "                                              500           999 " << mi->second << " i" << endl;
+	    } else {
+		cout << "11.11.111.11             0             0 " << mi->second << " i" << endl;
+	    }
+	}
+	return cout;
+    }
+
+
+
 };
 ostream & operator<< (ostream &out, const HashedPrefixes &h) {
     map <Prefix, int>::const_iterator mi;
@@ -618,16 +676,16 @@ ostream & operator<< (ostream &out, const HashedPrefixes &h) {
 HashedPrefixes view_ipv4;
 HashedPrefixes view_ipv6;
 
-int retrieve_last_as (const string & s) {
+int retrieve_last_as (const string & s, size_t offset = 0) {
     size_t p;
-    if ((s.size() < 64) || (!isalnum (s[63])))
+    if ((s.size() < (64+offset)) || (!isalnum (s[63+offset]))) {
 	return -1;
+    }
     p = s.rfind (' ');
     if (p == string::npos) return -1;
     if (p < 62) return -1;
     int AS = atoi (s.substr(p+1).c_str());
     if (AS != 0) return AS;
-    if (p == 0) return -1;
 
     p = s.rfind (' ', p-1);
     if (p == string::npos) return -1;
@@ -725,7 +783,7 @@ cerr << "hash_full_bgp : we have a ClassE prefix : " << prefixbase << " ??" << e
 
 		    Level3Addr prefixbase(TETHER_IPV6, s.substr(p));
 		    q = s.find_first_not_of("0123456789abcdefABCDEF:", p);
-		    if ((q != string::npos) && (s[q] == '/')) {	// it looks like an IPv4 prefix ...
+		    if ((q != string::npos) && (s[q] == '/')) {	// it looks like an IPv6 prefix ...
 			int masklen = atoi (s.substr (q+1).c_str());
 			Prefix prefix(prefixbase, masklen);
 			if (prefix.valid()) {
@@ -735,6 +793,9 @@ cerr << "hash_full_bgp : we have a ClassE prefix : " << prefixbase << " ??" << e
 				    view_ipv6.insert (prefix, AS);
 				    IP6ases [AS] = 1;
 				    ases [AS] = 1;
+				} else {
+				    curprefix = prefix;
+				    status = RFV_SEEK_GOODASPATH;
 				}
 			    } else {
 				curprefix = prefix;
@@ -752,11 +813,11 @@ cerr << "hash_full_bgp : we have a ClassE prefix : " << prefixbase << " ??" << e
 	  case RFV_SEEKBESTROUTE:
 	    // here, maybe we should roll back to previous state if we encounter a new prefix start line ?
 	    if (s[2] == '>') {
-		if ((s.size()<64) || (!isalnum(s[63]))) {
+		if ((s.size()<65) || (!isalnum(s[64]))) {
 		    status = RFV_SEEK_GOODASPATH;
 		    break;
 		}
-		int AS = retrieve_last_as (s);
+		int AS = retrieve_last_as (s,1);
 		if (AS != -1) {
 		    switch (curprefix.gettype()) {
 		      case TETHER_IPV4:
@@ -782,7 +843,7 @@ cerr << "hash_full_bgp : we have a ClassE prefix : " << prefixbase << " ??" << e
 	    if ((s.size()<65) || (!isalnum(s[64])))
 		break;
 	    else {
-		int AS = retrieve_last_as (s.substr(1));
+		int AS = retrieve_last_as (s.substr(1),1);
 		if (AS != -1) {
 		    switch (curprefix.gettype()) {
 		      case TETHER_IPV4:
@@ -1137,6 +1198,50 @@ void usage (ostream &cout, char *cmde0) {
 	 << endl;
 }
 
+bool do_read_full_view_and_co (const string & fullviewfname, bool dumpfv) {
+    if (!fullviewfname.empty()) {
+	ifstream fullview (fullviewfname.c_str());
+	if (!fullview) {
+	    int e = errno;
+	    cerr << "could not read full-view file : " << fullviewfname << " : " << strerror (e) << endl;
+	}
+	else {
+	    hash_full_bgp (fullview);
+	    view_ipv4.reparent();
+	    view_ipv6.reparent();
+	}
+    }
+
+    {	ifstream asnlist("asn.list");
+	hash_asnlist (asnlist);
+    }
+
+    {   Level3Addr m4(TETHER_IPV4, "255.255.255.255");
+	Level3Addr m6(TETHER_IPV6, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff");
+	m4.applymask (ipv4_mask);
+	m6.applymask (ipv6_mask);
+
+    cout << "ipv4mask = " << m4 << endl;
+    cout << "ipv6mask = " << m6 << endl << endl ;
+    }
+
+    if (dumpfv) {
+	string fv_fdump = "fullfv_dump.txt";
+	cerr << "starting to dump full-view to " << fv_fdump << " ... " << endl;
+	ofstream ffv (fv_fdump.c_str());
+	if (!ffv) {
+	    int e = errno;
+	    cerr << "could not open " << fv_fdump << " : " << strerror (e) << endl;
+	} else {
+	    view_ipv4.dump_a_la_ios (ffv, false);
+	    view_ipv6.dump_a_la_ios (ffv, true);
+	}
+    }
+    return false;
+}
+
+
+
 int main (int nb, char ** cmde) {
 
     int i;
@@ -1145,6 +1250,7 @@ int main (int nb, char ** cmde) {
     list<string> capturefiles;
     string dev;
     long count = 0;
+    bool dumpfv = false;	// should we dump the fullview after reading it ?
 
     for (i=1 ; i<nb ; i++) {
 	if (cmde[i][0] == '-') {
@@ -1202,6 +1308,9 @@ int main (int nb, char ** cmde) {
 	    if (strcmp (cmde[i], "--nomask") == 0) {
 		ipv4_mask = 32;
 		ipv6_mask = 128;
+	    }
+	    if (strncmp (cmde[i], "--dumpfv", 8) == 0) {
+		dumpfv = true;
 	    }
 	} else {    // attempt to read as a capture file
 	    capturefiles.push_back (cmde[i]);
@@ -1269,6 +1378,10 @@ if (false)	// set of basic tests for Prefix maps
 
     list<string>::iterator li;
 
+    // dumb hack for dumping full-view
+    if (dumpfv) {
+	full_view_and_co_not_read_yet = do_read_full_view_and_co (fullviewfname, dumpfv);
+    }
     for (li=capturefiles.begin() ; li!=capturefiles.end() ; li++) {
 	string &capturefile = *li;
 
@@ -1281,33 +1394,7 @@ if (false)	// set of basic tests for Prefix maps
 	dev = capturefile;
 
 	if (full_view_and_co_not_read_yet) {
-	    if (!fullviewfname.empty()) {
-		ifstream fullview (fullviewfname.c_str());
-		if (!fullview) {
-		    int e = errno;
-		    cerr << "could not read full-view file : " << fullviewfname << " : " << strerror (e) << endl;
-		}
-		else {
-		    hash_full_bgp (fullview);
-		    view_ipv4.reparent();
-		    view_ipv6.reparent();
-		}
-	    }
-
-	    {	ifstream asnlist("asn.list");
-		hash_asnlist (asnlist);
-	    }
-
-	    {   Level3Addr m4(TETHER_IPV4, "255.255.255.255");
-		Level3Addr m6(TETHER_IPV6, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff");
-		m4.applymask (ipv4_mask);
-		m6.applymask (ipv6_mask);
-
-	    cout << "ipv4mask = " << m4 << endl;
-	    cout << "ipv6mask = " << m6 << endl << endl ;
-	    }
-
-	    full_view_and_co_not_read_yet = false;
+	    full_view_and_co_not_read_yet = do_read_full_view_and_co (fullviewfname, dumpfv);
 	}
 	
 	if (pcap_datalink(handle) != DLT_EN10MB) {
