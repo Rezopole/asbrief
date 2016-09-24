@@ -212,4 +212,5 @@ diff fullfv_dump.bis.txt fullfv_dump.txt  && echo "      fullview re-reading tes
       fullview re-reading test ok
 ```
 
-
+##authors##
+please supply any request to capstat@rezopole.net, thanks in advance !
