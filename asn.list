@@ -511,7 +511,7 @@ name;id_ix_available;ripe_description
 14537;
 14926;
 15133;
-15169;
+15169;;GOOGLE
 15188;
 15360;;INTERFREE-NET
 15361;;UNSPECIFIED
@@ -4526,3 +4526,10 @@ name;id_ix_available;ripe_description
 262801;
 327690;
 333182;
+54113;;FASTLY
+42173;;Yahoo-Switzerland
+12322;;PROXAD
+36459;;GITHUB
+3333;;RIPE-NCC-AS
+43821;;WIKIMEDIA-EU
+
