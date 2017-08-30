@@ -29,8 +29,9 @@
 #include <sstream>
 
 #include <arpa/inet.h>	// inet_pton
+#include <stdlib.h>     // atoi
 
-#include "Ethertype.h"
+#include "ethertype.h"
 
 namespace rzpnet {
 
