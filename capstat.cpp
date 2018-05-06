@@ -31,6 +31,12 @@
 #include <list>
 #include <map>
 
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/nameser.h>
+#include <resolv.h>
+#include <netdb.h>  // h_errno ???
+
 #include <math.h>   // log2
 #include <stdlib.h> // atol
 #include <arpa/inet.h>	// inet_pton
@@ -498,6 +504,7 @@ ostream &operator<< (ostream &out, const Prefix &pr) {
     return out << pr.a << "/" << pr.ml;
 }
 
+int resolvAS (Level3Addr adr);
 
 class HashedPrefixes {
   public:
@@ -540,7 +547,7 @@ class HashedPrefixes {
 	    }
 	}
     }
-    int getAS (Level3Addr const &a) {
+    int getAS (Level3Addr const &a, bool do_externalResolve = true) {
 	int mask;
 	switch (a.t) {
 	    case TETHER_IPV4:
@@ -596,13 +603,23 @@ cerr << "getAS : " << a << " not into " << mi->first << endl;
 	Prefix const * pp = &mi->first;
 
 	while (pp != NULL) {
-	    if (pp->contain (tofind))
-		return pp->as;
-	    else
+	    if (pp->contain (tofind)) {
+		if (do_externalResolve && (pp->as <=0) && (pp->as > -42)) {	// the subnet isn't known to be in the map yet
+		    resolvAS (a);
+		    return getAS(a, false);
+		} else {
+		    return pp->as;
+		}
+	    } else
 		pp = pp->parent;
 	}
-	if (pp == NULL)
+	if (pp == NULL) {
+	    if (do_externalResolve) {
+		resolvAS (a);
+		return getAS(a, false);
+	    }
 	    return -2;
+	}
 	return -3;
 }
     }
@@ -913,13 +930,13 @@ void matcher (const Level3Addr &a, ostream &out) {
     }
 }
 
-int getAS (const Level3Addr &a) {
+int getAS (const Level3Addr &a, bool useexternalresolv) {
     switch (a.t) {
       case TETHER_IPV4:
-	return view_ipv4.getAS(a);
+	return view_ipv4.getAS(a, useexternalresolv);
 
       case TETHER_IPV6:
-	return view_ipv6.getAS(a);
+	return view_ipv6.getAS(a, useexternalresolv);
 
       default:
 	return 0;
@@ -1034,6 +1051,8 @@ void process_ipv6 (u_char *args, const u_char *packet, size_t len) {
     pq.l3dst.applymask (pq.ipv6_mask);
 }
 
+bool useexternalresolv = true;
+
 void process_packet (u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
     PacketQual &pq = *(PacketQual *) args;
     size_t l;
@@ -1114,13 +1133,13 @@ void process_packet (u_char *args, const struct pcap_pkthdr *header, const u_cha
 	    insert_qualifier (rep_pair_macaddr, pair, q);
 	}
 	if (pq.l3src.valid()) {
-	    AS ASsrc = getAS(pq.l3src);
+	    AS ASsrc = getAS(pq.l3src, useexternalresolv);
 	    insert_qualifier (rep_l3src, pq.l3src, q);
 	    insert_qualifier (rep_ASsrc, ASsrc, q);
 	    if (pq.l3src.t == TETHER_IPV6)
 		insert_qualifier (rep_ip6src, pq.l3src, q);
 	    if (pq.l3dst.valid()) {
-		AS ASdst = getAS(pq.l3dst);
+		AS ASdst = getAS(pq.l3dst, useexternalresolv);
 		insert_qualifier (rep_l3dst, pq.l3dst, q);
 		insert_qualifier (rep_ASdst, ASdst, q);
 		Level3AddrPair pair(pq.l3src, pq.l3dst);
@@ -1190,11 +1209,11 @@ void report (ostream &cout) {
 
 
 void usage (ostream &cout, char *cmde0) {
-    cout << "usage :  " << cmde0 << " [-h|--help] [[--capture=]filename] [--count=nbpackets]"
+    cout << "usage :  " << cmde0 << " [-h|--help] [[--capture=]filename] [--count=nbpackets]" << endl
 	 << "                  [--ceil=xx%] [--sizes] [--frames] [--sizes+frames (default)]" << endl
          << "                  [--mask=(0-32)] [--nomask]" << endl
          << "                  [--ipv4mask=(0-32)] [--ipv6mask=(0-128)]" << endl
-         << "                  [--fullview=fname ]" << endl
+         << "                  [--fullview=fname ] [--reportnodata]" << endl
 	 << endl;
 }
 
@@ -1204,11 +1223,14 @@ bool do_read_full_view_and_co (const string & fullviewfname, bool dumpfv) {
 	if (!fullview) {
 	    int e = errno;
 	    cerr << "could not read full-view file : " << fullviewfname << " : " << strerror (e) << endl;
+	    cerr << "will use external dns IP-AS resolver" << endl;
+	    useexternalresolv = true;
 	}
 	else {
 	    hash_full_bgp (fullview);
 	    view_ipv4.reparent();
 	    view_ipv6.reparent();
+	    useexternalresolv = false;
 	}
     }
 
@@ -1242,6 +1264,163 @@ bool do_read_full_view_and_co (const string & fullviewfname, bool dumpfv) {
 
 
 
+// ---------------------------------------------------------------------------------------------------------------------------
+//                     some asdig stuff ........
+//
+    const char 
+	*rzpv4 = "origin.asn.rezopole.net.",
+	*rzpv6 = "origin6.asn.rezopole.net.",
+	*cymruv4 = "origin.asn.cymru.com.",
+	*cymruv6 = "origin6.asn.cymru.com.",
+	*suffixv4 = rzpv4,
+	*suffixv6 = rzpv6;
+/*
+199422 | 77.95.68.0/22 | FR | ripe | 2013-01-24 | REZOPOLE
+199422 | 77.95.70.0/23 | FR | ripe | 2013-01-24 | REZOPOLE
+199422 | 77.95.71.0/24 | FR | ripe | 2013-01-24 | REZOPOLE
+199422 | 77.95.64.0/21 | FR | ripe | 2013-01-24 | REZOPOLE
+*/
+void parse_asdig_answer (const string &s, TEthertype atype, int &as, string &desc) {
+    size_t pos1 = s.find (" | ");
+    if (pos1 == string::npos) {
+	as = -1;
+	return;
+    }
+    as = atoi (s.c_str());
+    if (as == 0) {
+	if (strncmp (s.c_str(), "RFC", 3) == 0) {
+	    as = -atoi(s.c_str()+3);
+	}
+    }
+    size_t pos2 = s.find (" | ", pos1+3);
+    if (pos1 == string::npos) {
+	as = -1;
+	return;
+    }
+    
+    size_t pos3 = s.find ("/", pos1+3);
+    if (pos3 == string::npos) {
+	as = -1;
+	return;
+    }
+    Prefix p(Level3Addr(atype, s.substr(pos1+3, pos3-pos1-3)), atoi(s.substr(pos3+1,pos2-pos3-1).c_str()));
+
+    int i=0;
+    for (i=0 ; i<3 ; i++) {
+	pos1 = pos2;
+	pos2 = s.find (" | ", pos1+3);
+	if (pos1 == string::npos) {
+	    i = 0;
+	    break;
+	}
+    }
+    if (i == 3)
+	desc = s.substr (pos2+3);
+    else
+	desc = s.substr (0, s.find (" |")); // cas des reponses RFC_____
+
+    ASdesc [as] = desc;
+
+    switch (atype) {
+	case TETHER_IPV4:
+	    view_ipv4.insert (p, as);
+	    view_ipv4.reparent ();
+	    break;
+	case TETHER_IPV6:
+	    view_ipv6.insert (p, as);
+	    view_ipv6.reparent ();
+	    break;
+	default:
+	    break;
+    }
+}
+
+bool report_nodata = false;
+
+int resolvAS (Level3Addr adr) {
+    stringstream q;
+
+    adr.rev_arpa_radix (q);
+    switch (adr.t) {
+	case TETHER_IPV4:
+	    q << '.' << suffixv4;
+	    break;
+	case TETHER_IPV6:
+	    q << '.' << suffixv6;
+	    break;
+	default:
+	    break;
+    }
+    unsigned char answer [NS_PACKETSZ+10];
+    int r = res_query (q.str().c_str(), ns_c_in, ns_t_txt, (unsigned char *)answer, NS_PACKETSZ);
+    if (r < 0) {
+	switch (h_errno) {
+	    case HOST_NOT_FOUND:   /* Authoritative Answer Host not found */
+		cerr << "HOST_NOT_FOUND" << endl;
+		return 0;
+	    case TRY_AGAIN:        /* Non-Authoritative Host not found, or SERVERFAIL */
+		cerr << "DNS_ERROR" << endl;
+		cerr << "res_query: " << q.str() << " TRY_AGAIN" << endl;
+		return -4;
+	    case NO_RECOVERY:      /* Non recoverable errors, FORMERR, REFUSED, NOTIMP */
+		cerr << "DNS_ERROR" << endl;
+		cerr << "res_query: " << q.str() << "NO_RECOVERY:" << endl;
+		return -5;
+	    case NO_DATA:          /* Valid name, no data record of requested type */
+		if (report_nodata) {
+		    cerr << "res_query: " << q.str() << "   adr: " << adr << " NO_DATA:" << endl;
+		    cerr << "NO_DATA" << endl;
+		}
+		return -6;
+	    default:
+		cerr << "DNS_ERROR" << endl;
+		cerr << "res_query: " << q.str() << " error no:" << h_errno << endl;
+		return -7;
+
+	}
+	int e = h_errno;
+	cerr << "res_query error : " << e << " " << strerror(e) << endl;
+	return -8;
+    }
+
+
+
+    ns_msg handle;  /* handle for response message */
+    if (ns_initparse(answer, r, &handle) < 0) {
+	int e = errno;
+	cerr << "ns_initparse " << strerror(e) << endl;
+        return -9;
+    }
+
+
+    ns_rr rr;   /* expanded resource record */
+    for (int rrnum=0 ; rrnum < ns_msg_count(handle, ns_s_an) ; rrnum++) {
+        if (ns_parserr(&handle, ns_s_an, rrnum, &rr) != 0) {
+	    int e = errno;
+	    cerr << "ns_parserr error : " << strerror (e) << endl;
+        }
+        if (ns_rr_type(rr) == ns_t_txt) {
+	    string nsanswer;
+
+	    int l = (int)(*ns_rr_rdata(rr)); // the length of the TXT field (? JD)
+	    const unsigned char *pmax = ns_msg_base(handle) + ns_msg_size(handle);
+	    const unsigned char *p = ns_rr_rdata(rr) + 1;
+	    for (int i=0 ; (i<l) && (*p!=0) && (p<pmax) ; i++, p++) {
+		nsanswer += (char)(*p);
+	    }
+
+	    int as;
+	    string desc;
+
+	    parse_asdig_answer (nsanswer, adr.t, as, desc);
+	}
+    }
+
+    return 0;
+}
+//
+//                     end of some asdig stuff ........
+// ---------------------------------------------------------------------------------------------------------------------------
 int main (int nb, char ** cmde) {
 
     int i;
@@ -1266,6 +1445,9 @@ int main (int nb, char ** cmde) {
 	    }
 	    if (strncmp (cmde[i], "--fullview=", 11) == 0) {
 		fullviewfname = cmde[i]+11;
+	    }
+	    if (strncmp (cmde[i], "--reportnodata", 14) == 0) {
+		report_nodata = true;
 	    }
 	    if (strcmp (cmde[i], "--sizes") == 0) {
 		displaysizes = true;

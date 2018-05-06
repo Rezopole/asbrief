@@ -2,8 +2,11 @@
 all: capstat full.bgp.txt
 
 
-vimtest: capstat oldcapstat
-	./capstat yol.pcap --count=100 --sizes --fullview=full.bgp.txt
+vimtest: capstat
+	./capstat yol.pcap --count=100 --sizes
+	# test with supplied full-view ...
+	####./capstat yol.pcap --count=100 --sizes --fullview=full.bgp.txt
+	#
 	####   ./capstat ~/Captures/capture_lyon_paris_20160603.pcap --count=100 --sizes --fullview=full.bgp.txt
 	# ./capstat ~/Captures/capture_lyon_paris_20160603.pcap --capture=/users/jd/Captures/capture_lyon_paris_20160603.pcap --count=100 --frames --fullview=full.bgp.txt
 
@@ -21,7 +24,7 @@ fullviewtest: full.bgp.txt capstat
 	diff fullfv_dump.bis.txt fullfv_dump.txt  && echo "      fullview re-reading test ok" && rm fullfv_dump.bis.txt
 
 capstat: capstat.cpp macaddr.h readline.h fmtstream.h ethertype.h level3addr.h
-	g++ -Wall -o capstat capstat.cpp -lpcap
+	g++ -Wall -o capstat capstat.cpp -lpcap -lresolv
 
 testtabul: testtabul.cpp fmtstream.h
 	g++ -Wall -o testtabul testtabul.cpp

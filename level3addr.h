@@ -175,7 +175,29 @@ class Level3Addr {
 	}
 	return true;	// we should get there only if a == *this
     }
-
+    int rev_arpa_radix (ostream & cout) {
+	int i;
+	const char *h = "0123456789abcdef";
+	switch (t) {
+	    case TETHER_IPV4:
+		for (i=3 ; i>=0 ; i--) {
+		    cout << (int) b[i];
+		    if (i>0)
+		    cout << '.';
+		}
+		break;
+	    case TETHER_IPV6:
+		for (i=15 ; i>=0 ; i--) {
+		    cout << h[ b[i] & 0xf ] << '.' << h[ (b[i] & 0xf0)>>4 ];
+		    if (i>0)
+		    cout << '.';
+		}
+		break;
+	    default:
+		return -1;
+	}
+	return 0;
+    }
 };
 
 bool Level3Addr::mask_not_initialized = true;
