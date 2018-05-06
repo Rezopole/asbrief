@@ -20,9 +20,11 @@ and also the more common :
 ## requirements ##
 **libpcap** needs to be linked against the regular **libpcap** libraries, thus, for example, *debian-alike* machines would need **libpcap-dev** packages.
 
+**libpcap** needs to be linked against the regular **libresolv** libraries, thus, for example, *debian-alike* machines have it provided via **libc6-dev**
+
 the regular **STL** library is used too, so a valid **C++** compiler and templates is mandatory at building.
 
-An additionnal requirement would be to be able to get a decent **bgp full-view** in order to get a matching-list for *prefix* and *AS*. Yet **capstat** knows how to read Ciscos full-view. check the TODO list and suggest better ideas if you have.
+Now that an **external dns service** is used for matching IP with AS (rezopole's goasmap/asdig) the requirement of a **bgp full-view** isn't as mandatory as it used to, though it's still possible to use a particular local fullview, say for local-tuned results.
 
 ##build##
 yet there is no *autoconf* involved, so the **Makefile** may need some tuning with uncommon machines.
@@ -47,9 +49,8 @@ supplied by your own routers.
 shell> tcpdump -i en0 -c 10000 -w capture_file.pcap
     .../...
 
-# process the capture in regard with the supplied "full-view"
-shell> capstat capture_file.pcap --fullview=full.bgp.txt --sizes
-reading full view ...  done. 597815 IPv4 prefixes (53630 AS), 29939 IPv6 prefixes (11463 AS).   total :  53930 AS
+# process the capture
+shell> capstat capture_file.pcap --sizes
 ipv4mask = 255.255.255.0
 ipv6mask = ffff:ffff:ffff::
 
@@ -170,7 +171,7 @@ src/dst AS repartition : 70 src/dst AS, spread over 4452207 bytes
 - [x] verify prefix inclusion matching into getAS procedure !!!
 - [x] be classful-IPv4 aware and behave accordingly for full-view parsing
 - [ ] introduce a default local AS for locally announced prefix ie empty AS-paths)
-- [ ] introduce RF1918 privates spaces ...
+- [x] introduce RF1918 privates spaces ... (considered done via external lookup)
 - [ ] ICMP ???
 - [ ] ICMPV6 : dst endress ending with ':' to remove !
 
@@ -179,9 +180,10 @@ src/dst AS repartition : 70 src/dst AS, spread over 4452207 bytes
 - [ ]	man pages, examples
 
 #### data sorting and consolidations
+- [x]   use a dns-provided external lookup for IP-AS matches
 - [ ]   read _All_ prefixes as-path from instead of only the _Bests_.
 - [ ]   check for multiple-AS appartainances (?)
-- [ ]   retrieve the full view via snmp ??
+- [x]   retrieve the full view via snmp ?? (probably won't do, because of new external lookup)
 - [ ]   use whois and an inner cache for per-AS repartition
 - [x]   use a BGP full-view dump for per-AS repartition
 - [x]   use a mac-address registry for human-clarifyed output (iptraf format ?)
