@@ -26,7 +26,7 @@ the regular **STL** library is used too, so a valid **C++** compiler and templat
 
 Now that an **external dns service** is used for matching IP with AS (rezopole's goasmap/asdig) the requirement of a **bgp full-view** isn't as mandatory as it used to, though it's still possible to use a particular local fullview, say for local-tuned results.
 
-##build##
+## build ##
 yet there is no *autoconf* involved, so the **Makefile** may need some tuning with uncommon machines.
 
 ```
@@ -37,7 +37,7 @@ extracting full-view sample from archive
 gzip -dc full.bgp.txt.gz > full.bgp.txt
 ```
 
-##use##
+## use ##
 Here's below an example of use on a single-host end-user capture (september 2016).
 You'll notice that **one third** of the capture was **IPv6**, because the Internet-provider involved do supply **public IPv6 to the end-user**.
 
@@ -165,7 +165,7 @@ src/dst AS repartition : 70 src/dst AS, spread over 4452207 bytes
 14 [ (as15635)                                             (as0) ]   69750  1% 90%   (1% 90%  grand-total) 
 ```
 
-##TODO##
+## TODO ##
 
 #### BUGs !
 - [x] verify prefix inclusion matching into getAS procedure !!!
@@ -201,7 +201,7 @@ src/dst AS repartition : 70 src/dst AS, spread over 4452207 bytes
 - [ ]	svg or better output ?
 
 
-##unit-tests##
+## unit-tests ##
 there are not many unit-tests yet, but the target do exist in the makefile :
 
 ```
@@ -214,5 +214,5 @@ diff fullfv_dump.bis.txt fullfv_dump.txt  && echo "      fullview re-reading tes
       fullview re-reading test ok
 ```
 
-##authors##
+## authors ##
 please supply any request to capstat@rezopole.net, thanks in advance !
