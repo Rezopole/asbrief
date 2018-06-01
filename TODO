@@ -29,9 +29,13 @@ command flags
 Unit Testings
             provide a neutral and rather exhaustive capture for unit-testings
 
+Inputs
+	    read a json or xml full table ?
+
 Outputs
 	    json-encoded output
 	    html output
 	    svg or better output ?
+	    performance report: packets/s nb dnsreq/s dnsreq/1Kpackets ...
 
 
