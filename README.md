@@ -27,14 +27,15 @@ the regular **STL** library is used too, so a valid **C++** compiler and templat
 Now that an **external dns service** is used for matching IP with AS (rezopole's goasmap/asdig) the requirement of a **bgp full-view** isn't as mandatory as it used to, though it's still possible to use a particular local fullview, say for local-tuned results.
 
 ## build ##
-yet there is no *autoconf* involved, so the **Makefile** may need some tuning with uncommon machines.
-
+the following should bring you to a traditional build tree :
+```bash
+   libtoolize --force --copy && aclocal && autoheader && automake --add-missing --copy && autoconf
 ```
-shell> make
-g++ -Wall -o capstat capstat.cpp -lpcap
-echo extracting full-view sample from archive
-extracting full-view sample from archive
-gzip -dc full.bgp.txt.gz > full.bgp.txt
+then the traditional build sequence :
+```bash
+    ./configure
+    make
+    make install
 ```
 
 ## use ##

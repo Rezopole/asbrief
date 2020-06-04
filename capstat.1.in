@@ -1,0 +1,169 @@
+.\" {
+.\"
+.\"  capstat, renders a set of useful per-prefix, per-AS, etc, cross-repartitions. and more ....
+.\"  Copyright (C) 20162020 Jean-Daniel Pauget <jdpauget@rezopole.net>
+.\"  
+.\"  This program is free software; you can redistribute it and/or
+.\"  modify it under the terms of the GNU General Public License
+.\"  as published by the Free Software Foundation; either version 2
+.\"  of the License, or (at your option) any later version.
+.\"  
+.\"  This program is distributed in the hope that it will be useful,
+.\"  but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\"  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\"  GNU General Public License for more details.
+.\"  
+.\"  You should have received a copy of the GNU General Public License
+.\"  along with this program; if not, write to the Free Software
+.\"  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+.\"
+.\" }
+.TH "capstat-@CAPSTAT_VERSION@" "1" "2020" "jd" "capstat utility"
+.SH NAME
+capstat \- a C++ utility that fastly aggregates network statistics.
+.br
+.SH SYNOPSIS
+.B capstat
+.RI "[-h|--help] [... [--capture=]" filename " ...] [--count=" nbpackets "]"
+.in 15
+.RI "[--ceil=" xx "%] [--sizes] [--frames] [--sizes+frames (default)]"
+.RI "[--mask=(" 0-32 ")] [--nomask] [--ipv4mask=(" "0-32)" "] [--ipv6mask=(" 0-128 ")]"
+.RI "[--fullview=" fname "] [--reportnodata]"
+.SH DESCRIPTION
+for a set of
+.B pcap
+cpature-files,
+.B capstat
+produces summarizations :
+.IP \[bu] 2
+per AS repartitions
+.IP \[bu] 2
+from-AS / dest-AS matrices
+.IP \[bu] 2
+arbitrary-length-prefix repartitions and matrices
+.IP \[bu] 2
+all the above per IPv4 and per IPv6
+.IP \[bu] 2
+per mac-address repartitions and matrices
+.IP \[bu] 2
+per ethertype repartitions
+.IP \[bu] 2
+vlan repartitions
+
+in order to get IP/AS bindings,
+.B capstats
+either dns-query
+.I reference servers
+such as
+.BR Rezopole "'s"
+servers, or use a locally supplied
+.IR "full-view file" "."
+
+
+.SH OPTIONS
+
+.SS
+.BR -h " | " -help
+display a short help reminder.
+.SS
+.BI --capture= "filename"
+.B pcap-format
+capture-file to be analysed.
+.SS
+.BI --count= "nbpackets"
+limit the scope of analyse to the
+.I nbpackets
+first packets in the capture file.
+.SS
+.BI --ceil= "tot-percent" %
+limit the display up to a total of
+.I tot-percent
+of the global amount of packets or byte-size.
+useful for preventing the display of the long tail of highly dispersed small data.
+default :
+.BR 95 "%."
+.SS
+.B --sizes
+display only
+.BR byte-size "-ponderated"
+repartitions.
+.SS
+.B --frames
+display only
+.BR frame-count "-ponderated"
+repartitions.
+.SS
+.B --sizes+frames
+display both
+.BR frame-count "-ponderated"
+and
+.BR frame-count "-ponderated"
+repartitions. it is the default behaviour and it can be a bit verbose ...
+.SS
+.BR "--mask=" mask-size
+summarize repartitions by prior-simplifying addresses using the supplied
+.IR mask-size "."
+
+The given size is user for
+.BR IPv4 ","
+in the [0..32] range. A corresponding
+.B IPv6
+converted mask is computed by x2 multiplication.
+
+Example :
+.I --mask=24
+will use
+.B /24
+simplification for IPv4 and
+.B /48
+for IPv6.
+
+default :
+.B 24
+.SS
+.B --nomask
+Do not prior-simplify addresses with a mask before aggregations.
+
+Mandatory for per-host precise repartitions.
+.SS
+.BI "--ipv4mask=" IPv4-mask-size
+summarize repartitions by prior-simplifying
+.B IPv4
+addresses using the supplied
+.IR mask-size "."
+.SS
+.BI "--ipv6mask=" IPv6-mask-size
+summarize repartitions by prior-simplifying
+.B IPv6
+addresses using the supplied
+.IR mask-size "."
+.SS
+.BI --fullview= "filename"
+Use the supplied file as a Cisco-output "full BGP view" in order to bind IP-addresses to Autonomous-Systems (AS).
+The parsing of the intput can be rather long.
+.SS
+.B --reportnodata
+Report when some IP to AS lookup reached no data when dns-querying to
+.I reference-servers
+for those binding.
+.SH OUTPUT
+Some (few) output come from libpcap and (halas) can not be prevented.
+
+Each summarization is labeled and each line contains the percentage of
+the total amount and the sum of previous percentages up to the current.
+.SH RETURNED VALUES
+.B capstat
+returns
+.B 1
+(error) whenever major errors prevented the summarization, otherwise
+.B 0
+(success) is returned.
+.SH SEE ALSO
+.RB "(8)" tcpdump ", (3PCAP)" pcap ", (5)" pcap-savefile ", (7)" pcap-filter ", (7)" pcap-tstamp ", (1)" "hosts" ", (1)" ns-lookup ", (1)" dig ", (1)" whois
+.SH BUGS
+There may have any, please submit them to
+.B sysadm@rezopole.net
+.SH AUTHOR
+Jean-Daniel Pauget (jdpauget@rezopole.net) et Al.
+.SH MANPAGE VERSION
+@CAPSTAT_VERSION@

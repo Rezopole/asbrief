@@ -2,7 +2,7 @@
 // {
 //
 //  capstat, renders a set of useful per-prefix, per-AS, etc, cross-repartitions. and more ....
-//  Copyright (C) 2016 Jean-Daniel Pauget <jdpauget@rezopole.net>
+//  Copyright (C) 2016-2020 Jean-Daniel Pauget <jdpauget@rezopole.net>
 //  
 //  This program is free software; you can redistribute it and/or
 //  modify it under the terms of the GNU General Public License
