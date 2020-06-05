@@ -1,0 +1,25 @@
+Source: asbrief
+Section: admin
+Priority: optional
+Maintainer: Jean-Daniel Pauget <sysadm@rezopole.net>
+Build-Depends: debhelper (>= 11)
+Standards-Version: 4.1.3
+Homepage: https://github.com/Rezopole/asbrief
+#Vcs-Browser: https://salsa.debian.org/debian/asbrief
+#Vcs-Git: https://salsa.debian.org/debian/asbrief.git
+
+Package: asbrief
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: a C++ utility that fastly aggregates network statistics.
+ for a set of pcap cpature-files, asbrief produces summarizations :
+ • per AS repartitions
+ • from-AS / dest-AS matrices
+ • arbitrary-length-prefix repartitions and matrices
+ • all the above per IPv4 and per IPv6
+ • per mac-address repartitions and matrices
+ • per ethertype repartitions
+ • vlan repartitions
+ in  order  to get IP/AS bindings, asbriefs either dns-query reference
+ servers such as Rezopole's servers, or use a locally  supplied  full-
+ view file.
