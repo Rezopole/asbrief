@@ -1,3 +1,8 @@
+asbrief (0.0.80-2) RELEASE-TARGET; urgency=medium
+
+  * small packaging correction
+
+ -- Jean-Daniel Pauget <sysadm@rezopole.net>  Fri, 05 Jun 2020 21:13:37 +0200
 asbrief (0.0.80-1) RELEASE-TARGET; urgency=medium
 
   * Initial release
