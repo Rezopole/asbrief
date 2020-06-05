@@ -1,6 +1,6 @@
 .\" {
 .\"
-.\"  capstat, renders a set of useful per-prefix, per-AS, etc, cross-repartitions. and more ....
+.\"  asbrief, renders a set of useful per-prefix, per-AS, etc, cross-repartitions. and more ....
 .\"  Copyright (C) 20162020 Jean-Daniel Pauget <jdpauget@rezopole.net>
 .\"  
 .\"  This program is free software; you can redistribute it and/or
@@ -18,12 +18,12 @@
 .\"  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 .\"
 .\" }
-.TH "capstat-@CAPSTAT_VERSION@" "1" "2020" "jd" "capstat utility"
+.TH "asbrief-@ASBRIEF_VERSION@" "1" "2020" "jd" "asbrief utility"
 .SH NAME
-capstat \- a C++ utility that fastly aggregates network statistics.
+asbrief \- a C++ utility that fastly aggregates network statistics.
 .br
 .SH SYNOPSIS
-.B capstat
+.B asbrief
 .RI "[-h|--help] [... [--capture=]" filename " ...] [--count=" nbpackets "]"
 .in 15
 .RI "[--ceil=" xx "%] [--sizes] [--frames] [--sizes+frames (default)]"
@@ -33,7 +33,7 @@ capstat \- a C++ utility that fastly aggregates network statistics.
 for a set of
 .B pcap
 cpature-files,
-.B capstat
+.B asbrief
 produces summarizations :
 .IP \[bu] 2
 per AS repartitions
@@ -51,7 +51,7 @@ per ethertype repartitions
 vlan repartitions
 
 in order to get IP/AS bindings,
-.B capstats
+.B asbriefs
 either dns-query
 .I reference servers
 such as
@@ -152,18 +152,18 @@ Some (few) output come from libpcap and (halas) can not be prevented.
 Each summarization is labeled and each line contains the percentage of
 the total amount and the sum of previous percentages up to the current.
 .SH RETURNED VALUES
-.B capstat
+.B asbrief
 returns
 .B 1
 (error) whenever major errors prevented the summarization, otherwise
 .B 0
 (success) is returned.
 .SH SEE ALSO
-.RB "(8)" tcpdump ", (3PCAP)" pcap ", (5)" pcap-savefile ", (7)" pcap-filter ", (7)" pcap-tstamp ", (1)" "hosts" ", (1)" ns-lookup ", (1)" dig ", (1)" whois
+.RB "(8)" tcpdump ", (3PCAP)" pcap ", (5)" pcap-savefile ", (7)" pcap-filter ", (7)" pcap-tstamp ", (1)" asdig ", (1)" hosts ", (1)" ns-lookup ", (1)" dig ", (1)" whois
 .SH BUGS
 There may have any, please submit them to
 .B sysadm@rezopole.net
 .SH AUTHOR
 Jean-Daniel Pauget (jdpauget@rezopole.net) et Al.
 .SH MANPAGE VERSION
-@CAPSTAT_VERSION@
+@ASBRIEF_VERSION@

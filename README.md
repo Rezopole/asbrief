@@ -1,8 +1,8 @@
-# capstat #
+# asbrief #
 
 ## network-traffic AS-repartitions ##
 
-**capstat** is a C++ utility that fastly aggregates network statistics.
+**asbrief** is a C++ utility that fastly aggregates network statistics.
 
 from a set of libpcap captures it will produce :
 
@@ -51,7 +51,7 @@ shell> tcpdump -i en0 -c 10000 -w capture_file.pcap
     .../...
 
 # process the capture
-shell> capstat capture_file.pcap --sizes
+shell> asbrief capture_file.pcap --sizes
 ipv4mask = 255.255.255.0
 ipv6mask = ffff:ffff:ffff::
 
@@ -207,7 +207,7 @@ there are not many unit-tests yet, but the target do exist in the makefile :
 
 ```
 shell>make test
-./capstat --fullview=full.bgp.txt --dumpfv
+./asbrief --fullview=full.bgp.txt --dumpfv
 reading full view ...  done. 597814 IPv4 prefixes (53629 AS), 29939 IPv6 prefixes (11463 AS).   total :  53929 AS
 ipv4mask = 255.255.255.0
 .../...
@@ -216,4 +216,4 @@ diff fullfv_dump.bis.txt fullfv_dump.txt  && echo "      fullview re-reading tes
 ```
 
 ## authors ##
-please supply any request to capstat@rezopole.net, thanks in advance !
+please supply any request to asbrief@rezopole.net, thanks in advance !

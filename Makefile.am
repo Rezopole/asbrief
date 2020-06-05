@@ -1,6 +1,6 @@
 ## {
 ##
-##  capstat, renders a set of useful per-prefix, per-AS, etc, cross-repartitions. and more ....
+##  asbrief, renders a set of useful per-prefix, per-AS, etc, cross-repartitions. and more ....
 ##  Copyright (C) 2016-2020 Jean-Daniel Pauget <jdpauget@rezopole.net>
 ##  
 ##  This program is free software; you can redistribute it and/or
@@ -22,33 +22,33 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
-vimtest: capstat
-	./capstat yol.pcap --count=100 --sizes
+vimtest: asbrief
+	./asbrief yol.pcap --count=100 --sizes
 	## test with supplied full-view ...
-	## ##./capstat yol.pcap --count=100 --sizes --fullview=full.bgp.txt
+	## ##./asbrief yol.pcap --count=100 --sizes --fullview=full.bgp.txt
 	##
-	## ##   ./capstat ~/Captures/capture_lyon_paris_20160603.pcap --count=100 --sizes --fullview=full.bgp.txt
-	## ./capstat ~/Captures/capture_lyon_paris_20160603.pcap --capture=/users/jd/Captures/capture_lyon_paris_20160603.pcap --count=100 --frames --fullview=full.bgp.txt
+	## ##   ./asbrief ~/Captures/capture_lyon_paris_20160603.pcap --count=100 --sizes --fullview=full.bgp.txt
+	## ./asbrief ~/Captures/capture_lyon_paris_20160603.pcap --capture=/users/jd/Captures/capture_lyon_paris_20160603.pcap --count=100 --frames --fullview=full.bgp.txt
 
 test: fullviewtest
 
 .PHONY: fullviewtest
-fullviewtest: full.bgp.txt capstat
-	./capstat --fullview=full.bgp.txt --dumpfv
+fullviewtest: full.bgp.txt asbrief
+	./asbrief --fullview=full.bgp.txt --dumpfv
 	mv fullfv_dump.txt fullfv_dump.bis.txt
-	./capstat --fullview=fullfv_dump.bis.txt  --dumpfv
+	./asbrief --fullview=fullfv_dump.bis.txt  --dumpfv
 	diff fullfv_dump.bis.txt fullfv_dump.txt  && echo "      fullview re-reading test ok" && rm fullfv_dump.bis.txt
 
 full.bgp.txt: full.bgp.txt.gz
 	echo extracting full-view sample from archive
 	gzip -dc full.bgp.txt.gz > full.bgp.txt
 
-bin_PROGRAMS = capstat
-man1_MANS = capstat.1
+bin_PROGRAMS = asbrief
+man1_MANS = asbrief.1
 
-capstat_SOURCES = capstat.cpp macaddr.h readline.h fmtstream.h ethertype.h level3addr.h
-capstat_CXXFLAGS = @CXXFLAGS@ @RESOLV_CXXFLAGS@ 
-capstat_LDADD =  @RESOLV_LDFLAGS@ @LIBPCAPLDFLAGS@
+asbrief_SOURCES = asbrief.cpp macaddr.h readline.h fmtstream.h ethertype.h level3addr.h
+asbrief_CXXFLAGS = @CXXFLAGS@ @RESOLV_CXXFLAGS@ 
+asbrief_LDADD =  @RESOLV_LDFLAGS@ @LIBPCAPLDFLAGS@
 
 clean-local:
 	rm -f full.bgp.txt fullfv_dump.txt fullfv_dump.bis.txt

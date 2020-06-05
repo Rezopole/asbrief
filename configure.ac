@@ -1,6 +1,6 @@
 dnl {
 dnl
-dnl  capstat, renders a set of useful per-prefix, per-AS, etc, cross-repartitions. and more ....
+dnl  asbrief, renders a set of useful per-prefix, per-AS, etc, cross-repartitions. and more ....
 dnl  Copyright (C) 20162020 Jean-Daniel Pauget <jdpauget@rezopole.net>
 dnl  
 dnl  This program is free software; you can redistribute it and/or
@@ -20,8 +20,8 @@ dnl
 dnl }
 
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT([capstat], [0.0.80], [sysadm@rezopole.net])
-AC_CONFIG_SRCDIR([./capstat.cpp])
+AC_INIT([asbrief], [0.0.80], [sysadm@rezopole.net])
+AC_CONFIG_SRCDIR([./asbrief.cpp])
 
 
 dnl Detect the canonical host and target build environment
@@ -37,8 +37,8 @@ AC_CONFIG_MACRO_DIR([m4])
 
 dnl autoheader
 AM_CONFIG_HEADER(config.h)
-AC_DEFINE_UNQUOTED([CAPSTAT_VERSION], ["$VERSION"], [the release-version of capstat])
-AC_SUBST(CAPSTAT_VERSION,[$VERSION])
+AC_DEFINE_UNQUOTED([ASBRIEF_VERSION], ["$VERSION"], [the release-version of asbrief])
+AC_SUBST(ASBRIEF_VERSION,[$VERSION])
 
 dnl Check for tools
 
@@ -116,7 +116,7 @@ void testpcap (void) {
             ])
             if test x$have_libpcap = xyes; then
                 INCPATH="$INCPATH -I$P_INC/include"
-                if test "x$libpcapstatic" = "xyes"; then
+                if test "x$libpasbriefic" = "xyes"; then
                     LIBPCAPLDFLAGS=""
                     LIBPCAPLDLIB="${P_INC}/lib/libpcap.a"
                 else
@@ -151,7 +151,7 @@ CXXFLAGS="$INCPATH $CXXFLAGS"
 dnl Finally create all the generated files
 AC_OUTPUT([
 	Makefile
-	capstat.1
+	asbrief.1
 ])
 
 
